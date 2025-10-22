@@ -7,6 +7,7 @@ import Register from "./components/Auth/Register"
 import Dashboard from "./components/Pages/Dashboard"
 import Login from "./components/Auth/Login";
 import Book_Program from "./components/Pages/Book_program";
+import Programs from "./components/Pages/Programs"
 
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="login" element={<Login/>} />
           <Route path="bookprogram" element={<Book_Program/>} />
+          <Route path="programs" element={<Programs/>} />
 
 
 
