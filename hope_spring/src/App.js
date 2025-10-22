@@ -6,6 +6,7 @@ import Login from './components/Auth/Login';
 import Register from "./components/Auth/Register";
 import Dashboard from "./components/Pages/Dashboard";
 import Programs from "./components/Pages/Programs";
+import Book_Program from "./components/Pages/Book_program";
 
 function App() {
   return (
@@ -15,8 +16,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/programs" element={<Programs />} />
-
-
+        <Route path="/bookProgram" element={<Book_Program />} />
       </Routes>
     </BrowserRouter>
   );
