@@ -5,6 +5,9 @@ import Meditation from "./pages/Programs/Meditation";
 import Page from "./pages/Page"; // generic page template
 import Register from "./components/Auth/Register"
 import Dashboard from "./components/Pages/Dashboard"
+import Login from "./components/Auth/Login";
+import Book_Program from "./components/Pages/Book_program";
+
 
 export default function App() {
   return (
@@ -17,6 +20,10 @@ export default function App() {
           <Route path="register" element={<Register />} />
 
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="login" element={<Login/>} />
+          <Route path="bookprogram" element={<Book_Program/>} />
+
+
 
 
           {/* Get Started */}
