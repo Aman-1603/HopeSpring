@@ -3,6 +3,8 @@ import Header from "./components/Header";
 import Home from "./pages/Home";
 import Meditation from "./pages/Programs/Meditation";
 import Page from "./pages/Page"; // generic page template
+import Register from "./components/Auth/Register"
+import Dashboard from "./components/Pages/Dashboard"
 
 export default function App() {
   return (
@@ -11,6 +13,11 @@ export default function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
+
+          <Route path="register" element={<Register />} />
+
+          <Route path="dashboard" element={<Dashboard />} />
+
 
           {/* Get Started */}
           <Route path="/get-started/living-with-cancer" element={<Page title="I am living with cancer or I am a survivor" />} />
