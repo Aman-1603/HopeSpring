@@ -1,44 +1,54 @@
 import { Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
+import Footer from "./components/Footer";    
+import Newsletter from "./components/Newsletter";        
+
 import Home from "./pages/Home";
+import Page from "./pages/Page";                     
 import Meditation from "./pages/Programs/Meditation";
-import Page from "./pages/Page"; // generic page template
-import Register from "./components/Auth/Register"
-import Dashboard from "./components/Pages/Dashboard"
+
+import Register from "./components/Auth/Register";
+import Dashboard from "./components/Pages/Dashboard";
 import Login from "./components/Auth/Login";
 import Book_Program from "./components/Pages/Book_program";
-import Programs from "./components/Pages/Programs"
+import Programs from "./components/Pages/Programs";
+import LivingWithCancer from "./components/Pages/GetStarted/LivingwithCancer";
+import CaregiverFamily from "./components/Pages/GetStarted/CaregiverFamily";
+import ProviderPartner from "./components/Pages/GetStarted/ProviderPartner";
+import GiveOrVolunteer from "./components/Pages/GetStarted/GiveOrVolunteer";
+import Donate from "./pages/Donate";
+import Resources from "./components/Pages/Resources";
+
 
 
 export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+
       <main className="flex-1">
         <Routes>
+          {/* Home */}
           <Route path="/" element={<Home />} />
 
-          <Route path="register" element={<Register />} />
-
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="login" element={<Login/>} />
-          <Route path="bookprogram" element={<Book_Program/>} />
-          <Route path="programs" element={<Programs/>} />
-
-
-
+          {/* Auth / misc */}
+          <Route path="/register" element={<Register />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/bookprogram" element={<Book_Program />} />
+          <Route path="/programs" element={<Programs />} />
 
           {/* Get Started */}
-          <Route path="/get-started/living-with-cancer" element={<Page title="I am living with cancer or I am a survivor" />} />
-          <Route path="/get-started/caregiver-family" element={<Page title="I am a caregiver, supporter, or family member" />} />
-          <Route path="/get-started/provider-partner" element={<Page title="I am a healthcare provider or community partner" />} />
-          <Route path="/get-started/give-or-volunteer" element={<Page title="I want to give or volunteer" />} />
+          <Route path="/get-started/living-with-cancer" element={<LivingWithCancer />}/>
+          <Route path="/get-started/caregiver-family" element={<CaregiverFamily />} />
+          <Route path="/get-started/provider-partner" element={<ProviderPartner />} />
+          <Route path="/get-started/give-or-volunteer" element={<GiveOrVolunteer />} />
 
           {/* Get Free Support */}
           <Route path="/support/calendar" element={<Page title="View Calendar & Register" />} />
           <Route path="/support/programs" element={<Page title="Programs" />} />
           <Route path="/support/programs/support-groups" element={<Page title="Support Groups" />} />
-          <Route path="/support/programs/gentle-exercise/meditation" element={<Page title="Meditation" />} />
+          <Route path="/support/programs/gentle-exercise/meditation" element={<Meditation />} /> {/* real page */}
           <Route path="/support/programs/gentle-exercise/yoga" element={<Page title="Yoga" />} />
           <Route path="/support/programs/gentle-exercise/tai-chi" element={<Page title="Tai Chi" />} />
           <Route path="/support/programs/gentle-exercise/qi-gong" element={<Page title="Qi Gong" />} />
@@ -50,13 +60,15 @@ export default function App() {
           <Route path="/support/programs/relaxation/massage-therapy" element={<Page title="Massage Therapy" />} />
           <Route path="/support/programs/relaxation/therapeutic-touch" element={<Page title="Therapeutic Touch" />} />
           <Route path="/support/programs/relaxation/reiki" element={<Page title="Reiki" />} />
+          <Route path="/resources" element={<Resources />} />
+
 
           {/* Book a Service */}
           <Route path="/book/cancer-care-counselling" element={<Page title="Cancer Care Counselling" />} />
           <Route path="/book/wigs-camisoles-headcovers" element={<Page title="Wigs, Camisoles, Headcovers" />} />
 
           {/* Get Involved */}
-          <Route path="/donate" element={<Page title="Donate" />} />
+          <Route path="/donate" element={<Donate />} />
           <Route path="/become-a-member" element={<Page title="Become a Member" />} />
           <Route path="/volunteer" element={<Page title="Volunteer" />} />
           <Route path="/fundraise" element={<Page title="Fundraise" />} />
@@ -74,10 +86,11 @@ export default function App() {
 
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
-          <Route path="/support/programs/gentle-exercise/meditation" element={<Meditation />} />
-
         </Routes>
       </main>
+
+      <Newsletter />
+      <Footer />   
     </div>
   );
 }

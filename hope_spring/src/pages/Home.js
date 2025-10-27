@@ -163,18 +163,18 @@ export default function Home() {
             />
           </div>
           <div className="flex flex-col justify-center">
-            <h3 className="text-2xl font-bold text-[#0e2340]">
+            <h3 className="text-4xl font-bold text-[#0e2340]">
               2 in 5 Canadians are expected to be diagnosed with cancer in their lifetime.
-            </h3>
+            </h3><br></br>
+            <h4 className="text-2xl font bold text-[#0e2340]">We’re on a mission to inspire, empower, and give hope to lives.</h4>
             <p className="text-gray-700 mt-2 leading-relaxed">
-              This column sits beside the video on desktop and stacks on mobile.
-              If it stacks cleanly, your responsive grid is working.
-            </p>
+              We know a cancer diagnosis can be a devastating experience; the emotional and sometimes financial strain can be as shattering as the physical disease itself. HopeSpring Cancer Support Centre exists to offer you information, emotional support, and the tools needed for empowerment, personal growth and self-help.
+            </p><br></br>
             <a
               href="#about"
               className="mt-4 inline-block rounded-xl bg-[#0e2340] text-white px-5 py-3 font-semibold w-fit shadow-sm hover:brightness-110"
             >
-              Learn more
+              Learn More about HopeSpring
             </a>
           </div>
         </div>
@@ -182,34 +182,18 @@ export default function Home() {
 
       {/* PARTNERS */}
       <section className="bg-[#fff7ef]">
+        
         <div className="mx-auto max-w-6xl px-4 py-10">
+        <p>We are grateful for the support of our trusted partners who share our vision of empowering lives affected by cancer. Together, we create a network of care and compassion.</p>
+
           <div className="h-20 rounded-xl bg-white/60 border border-gray-200 grid place-content-center text-gray-500">
-            Partner logos strip
+            <p>Hello</p>
           </div>
         </div>
       </section>
 
-      {/* NEWSLETTER */}
-      <section className="bg-[#fff6ea] border-y border-[#ffe3bf] py-10">
-        <div className="mx-auto max-w-6xl px-4 grid gap-4 md:grid-cols-2 items-center">
-          <div>
-            <h3 className="text-2xl font-bold text-[#0b1c33]">Subscribe to our Newsletter</h3>
-            <p className="text-gray-700">Get updates on events, programs, and ways to help.</p>
-          </div>
-          <form onSubmit={(e) => e.preventDefault()} className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="email"
-              required
-              placeholder="Email address"
-              className="flex-1 h-11 rounded-xl border border-gray-300 px-3 placeholder:text-gray-400
-                         focus:outline-none focus:ring-2 focus:ring-[#0e2340]/30"
-            />
-            <button className="h-11 px-5 rounded-xl bg-[#0e2340] text-white font-semibold shadow-sm hover:brightness-110">
-              Subscribe
-            </button>
-          </form>
-        </div>
-      </section>
+
+
     </>
   );
 }
