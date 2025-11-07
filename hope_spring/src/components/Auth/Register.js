@@ -56,7 +56,7 @@ const Register = () => {
       <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 md:p-12 w-full max-w-md sm:max-w-lg md:max-w-xl text-center transition-all duration-300">
         {/* Logo */}
         <div className="flex justify-center mb-5 sm:mb-6">
-          <img src={HopeSpringLogo} alt="HopeSpring Logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+          <img src="/images/logo2.png" alt="HopeSpring Logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
         </div>
 
         {/* Title */}

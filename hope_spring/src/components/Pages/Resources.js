@@ -163,7 +163,7 @@ const SECTIONS = [
 
   // ----- create more sections reusing the same structure -----
   {
-    title: "Counselling",
+    title: "Community Service",
     rows: [
       {
         name: "Cancer Care Counselling (HopeSpring)",
@@ -179,7 +179,7 @@ const SECTIONS = [
     ],
   },
     {
-    title: "Counselling",
+    title: "National Services",
     rows: [
       {
         name: "Cancer Care Counselling (HopeSpring)",

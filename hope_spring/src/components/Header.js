@@ -1,7 +1,8 @@
+// src/components/Header.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 
-/** MENU DATA (internal pages use `to`) */
+/** ---------- MENU DATA ---------- */
 const MENU = [
   {
     label: "Get Started",
@@ -145,6 +146,7 @@ export default function Header() {
                         active ? "text-black font-semibold" : ""
                       }`}
                       aria-haspopup="true"
+                      aria-expanded={active}
                     >
                       {item.label}
                       <svg
@@ -171,7 +173,7 @@ export default function Header() {
                     </NavLink>
                   )}
 
-                  {/* level-1 dropdown (hover bridge + high z + clickable) */}
+                  {/* level-1 dropdown (open on hover) */}
                   {item.children && (
                     <div
                       className="absolute left-0 top-full z-[60] pt-2
@@ -179,7 +181,7 @@ export default function Header() {
                                  group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto
                                  transition"
                     >
-                      <MenuPanel items={item.children} />
+                      <DesktopMenuPanel items={item.children} />
                     </div>
                   )}
                 </li>
@@ -205,7 +207,7 @@ export default function Header() {
       {/* Mobile drawer */}
       <div
         ref={navRef}
-        className={`md:hidden border-t border-gray-200 bg-white transition-[max-height] overflow-hidden ${
+        className={`md:hidden border-top border-gray-200 bg-white transition-[max-height] overflow-hidden ${
           mobileOpen ? "max-h-[80vh]" : "max-h-0"
         }`}
       >
@@ -223,48 +225,60 @@ export default function Header() {
   );
 }
 
-/* ---------- Desktop dropdown panel ---------- */
-function MenuPanel({ items }) {
+/* ---------- Desktop dropdown panel (STATEFUL) ---------- */
+/* Ensures only one sibling submenu is open at a time */
+function DesktopMenuPanel({ items }) {
+  const [openIdx, setOpenIdx] = React.useState(null);
+
   return (
-    <ul className="min-w-[220px] rounded-xl border border-gray-200 bg-white shadow-lg p-2">
-      {items.map((it, idx) => (
-        <li key={idx} className="relative group/item">
-          {it.children ? (
-            <>
+    <ul className="relative min-w-[240px] rounded-xl border border-gray-200 bg-white shadow-lg p-2 overflow-visible">
+      {items.map((it, idx) => {
+        const hasChildren = !!it.children;
+        const isOpen = openIdx === idx;
+
+        return (
+          <li
+            key={idx}
+            className="relative"
+            onMouseEnter={() => hasChildren && setOpenIdx(idx)}
+            onMouseLeave={() => hasChildren && setOpenIdx((v) => (v === idx ? null : v))}
+          >
+            {hasChildren ? (
               <button
                 type="button"
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50"
                 aria-haspopup="true"
+                aria-expanded={isOpen}
               >
                 <span>{it.label}</span>
-                <svg className="h-3.5 w-3.5 transition-transform group-hover/item:translate-x-0.5" viewBox="0 0 24 24" fill="none">
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" />
                 </svg>
               </button>
-              <div
-                className="absolute left-full top-0 z-[60] pl-2
-                           opacity-0 translate-x-1 pointer-events-none
-                           group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:pointer-events-auto
-                           transition"
+            ) : (
+              <NavLink
+                to={it.to}
+                end
+                className={({ isActive }) =>
+                  `block px-3 py-2 rounded-lg hover:bg-gray-50 ${
+                    isActive ? "bg-gray-100 font-semibold text-[#0b1c33]" : ""
+                  }`
+                }
+                onMouseEnter={() => setOpenIdx(null)} // close siblings when hovering a leaf
               >
-                <MenuPanel items={it.children} />
+                {it.label}
+              </NavLink>
+            )}
+
+            {/* Child panel (only one at a time) */}
+            {hasChildren && isOpen && (
+              <div className="absolute left-full top-0 z-[60] pl-2">
+                <DesktopMenuPanel items={it.children} />
               </div>
-            </>
-          ) : (
-            <NavLink
-              to={it.to}
-              end
-              className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg hover:bg-gray-50 ${
-                  isActive ? "bg-gray-100 font-semibold text-[#0b1c33]" : ""
-                }`
-              }
-            >
-              {it.label}
-            </NavLink>
-          )}
-        </li>
-      ))}
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

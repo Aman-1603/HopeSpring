@@ -71,11 +71,7 @@ export default function LivingWithCancer() {
         <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
           <div className="max-w-3xl">
             {/* Optional ribbon/hero image */}
-            <img
-              src="/images/ribbon-hero.png"       // put your hero ribbon at /public/images/ribbon-hero.png
-              alt=""
-              className="w-[520px] max-w-full mb-6"
-            />
+            
             <h1 className="text-2xl md:text-3xl font-semibold text-[#0b1c33]">
               I am living with cancer or I am a survivor – Category
             </h1>
@@ -88,7 +84,7 @@ export default function LivingWithCancer() {
         <div className="mx-auto max-w-6xl px-4 grid gap-8 md:grid-cols-2 items-start">
           <div>
             <img
-              src="/images/hope-lawn.jpg"     // /public/images/hope-lawn.jpg
+              src="/images/s1.png"     // /public/images/hope-lawn.jpg
               alt="HopeSpring community"
               className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
@@ -167,7 +163,7 @@ export default function LivingWithCancer() {
               Physical, Mental, and Spiritual Well-being
             </h3>
             <img
-              src="/images/portrait-smile.jpg"    // /public/images/portrait-smile.jpg
+              src="/images/s2.png"    // /public/images/portrait-smile.jpg
               alt="Participant smiling"
               className="mt-4 w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
@@ -200,14 +196,14 @@ export default function LivingWithCancer() {
               Our staff and volunteers provide personalized care and practical tools for your journey.
             </p>
             <img
-              src="/images/hands-flower.jpg"      // /public/images/hands-flower.jpg
+              src="/images/s3.png"      // /public/images/hands-flower.jpg
               alt="Hands holding flower"
               className="mt-5 w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
           </div>
           <div>
             <img
-              src="/images/ribbon-pink.jpg"       // /public/images/ribbon-pink.jpg
+              src="/images/s4.png"       // /public/images/ribbon-pink.jpg
               alt="Pink ribbon"
               className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
