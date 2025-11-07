@@ -42,6 +42,7 @@ import OurTeam from "./components/Pages/About/Team";
 import BoardOfDirectors from "./components/Pages/About/BDirector";
 import DonorPartners from "./components/Pages/About/Donor";
 import Reports from "./components/Pages/About/Report";
+import AdminDashboard from "./AdminSection/AdminDashboard";
 
 
 
@@ -62,6 +63,9 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/bookprogram" element={<Book_Program />} />
           <Route path="/programs" element={<Programs />} />
+          <Route path="/admin-dashboard" element={<AdminDashboard />} />
+
+
 
           {/* Get Started */}
           <Route path="/get-started/living-with-cancer" element={<LivingWithCancer />}/>
