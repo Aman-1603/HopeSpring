@@ -45,6 +45,7 @@ import Reports from "./components/Pages/About/Report";
 import AdminDashboard from "./AdminSection/AdminDashboard";
 import UsersPage from "./AdminSection/UsersPage";
 import ProgramManagement from "./AdminSection/AddProgram";
+import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
 <Routes>
   <Route path="/admin/dashboard" element={<AdminDashboard />} />
   <Route path="/admin/users" element={<UsersPage />} />
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/addProgram" element={<ProgramManagement/>} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/activeprogram" element={<ActiveProgramsPage />} />
 
 
 
@@ -125,6 +127,7 @@ export default function App() {
 
           {/* Admin Section */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
 
           {/* 404 */}

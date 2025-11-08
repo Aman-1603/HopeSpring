@@ -46,10 +46,10 @@ const AdminDashboard = () => {
     { label: "New Announcement", icon: Plus },
   ];
 
-  // ✅ Correct navigation logic
+
   const handleCardClick = (title) => {
     if (title === "Total Users") navigate("/admin/users");
-    else if (title === "Active Programs") navigate("/admin/programs");
+    else if (title === "Active Programs") navigate("/admin/active-programs");
     else if (title === "Total Donations") navigate("/admin/donations");
     else if (title === "Avg. Attendance") navigate("/admin/attendance");
   };
