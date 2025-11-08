@@ -44,6 +44,7 @@ import DonorPartners from "./components/Pages/About/Donor";
 import Reports from "./components/Pages/About/Report";
 import AdminDashboard from "./AdminSection/AdminDashboard";
 import UsersPage from "./AdminSection/UsersPage";
+import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
 <Routes>
   <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/bookprogram" element={<Book_Program />} />
           <Route path="/programs" element={<Programs />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
+          <Route path="/addProgram" element={<ProgramManagement/>} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/activeprogram" element={<ActiveProgramsPage />} />
 
