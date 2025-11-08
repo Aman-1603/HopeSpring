@@ -46,13 +46,7 @@ import AdminDashboard from "./AdminSection/AdminDashboard";
 import UsersPage from "./AdminSection/UsersPage";
 import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
-<Routes>
-  <Route path="/admin/dashboard" element={<AdminDashboard />} />
-  <Route path="/admin/users" element={<UsersPage />} />
-</Routes>
-
-
-
+import Announcements from "./AdminSection/Announcements";
 
 
 export default function App() {
@@ -65,17 +59,18 @@ export default function App() {
           {/* Home */}
           <Route path="/" element={<Home />} />
 
+          {/* Admin Section */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
+          <Route path="/admin/announcements" element={<Announcements />} />
+
           {/* Auth / misc */}
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/bookprogram" element={<Book_Program />} />
           <Route path="/programs" element={<Programs />} />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          <Route path="/addProgram" element={<ProgramManagement/>} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/activeprogram" element={<ActiveProgramsPage />} />
-
 
 
           {/* Get Started */}
