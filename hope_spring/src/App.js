@@ -45,6 +45,12 @@ import Reports from "./components/Pages/About/Report";
 import AdminDashboard from "./AdminSection/AdminDashboard";
 import UsersPage from "./AdminSection/UsersPage";
 
+<Routes>
+  <Route path="/admin/dashboard" element={<AdminDashboard />} />
+  <Route path="/admin/users" element={<UsersPage />} />
+</Routes>
+
+
 
 
 
@@ -113,6 +119,12 @@ export default function App() {
           <Route path="/board-of-directors" element={<BoardOfDirectors />} />
           <Route path="/donors-and-partners" element={<DonorPartners />} />
           <Route path="/reports" element={<Reports />} />
+
+
+
+          {/* Admin Section */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<UsersPage />} />
 
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />

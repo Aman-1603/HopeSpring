@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Users, Calendar, DollarSign, TrendingUp, Plus } from "lucide-react";
 import {
   LineChart,
@@ -30,6 +31,8 @@ const attendanceData = [
 ];
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+
   const stats = [
     { title: "Total Users", value: "1,247", icon: Users, change: "+12%" },
     { title: "Active Programs", value: "24", icon: Calendar, change: "+3" },
@@ -42,6 +45,14 @@ const AdminDashboard = () => {
     { label: "Add Event", icon: Calendar },
     { label: "New Announcement", icon: Plus },
   ];
+
+  // ✅ Correct navigation logic
+  const handleCardClick = (title) => {
+    if (title === "Total Users") navigate("/admin/users");
+    else if (title === "Active Programs") navigate("/admin/programs");
+    else if (title === "Total Donations") navigate("/admin/donations");
+    else if (title === "Avg. Attendance") navigate("/admin/attendance");
+  };
 
   return (
     <div className="p-6 space-y-10 bg-gradient-to-b from-[#f7f5fb] to-[#f3f0fa] min-h-screen">
@@ -60,7 +71,8 @@ const AdminDashboard = () => {
         {stats.map((stat, index) => (
           <div
             key={index}
-            className="bg-white rounded-2xl p-6 shadow-md hover:shadow-lg transition-all border border-gray-100"
+            onClick={() => handleCardClick(stat.title)}
+            className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -80,7 +92,7 @@ const AdminDashboard = () => {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Donation Trend */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-md">
