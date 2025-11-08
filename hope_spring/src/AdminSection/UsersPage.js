@@ -8,8 +8,8 @@ const UsersPage = () => {
   const users = [
     { name: "Aman Ansari", email: "aman@hopespring.com", role: "Admin", joined: "2025-10-01", status: "Active" },
     { name: "Kamendra Singh", email: "kamendra@hopespring.com", role: "Member", joined: "2025-10-12", status: "Active" },
-    { name: "Sushil Sharma", email: "sushil@hopespring.com", role: "Volunteer", joined: "2025-09-22", status: "Inactive" },
-    { name: "Mary Jones", email: "mary@hopespring.com", role: "Staff", joined: "2025-08-15", status: "Active" },
+    { name: "Sushil Sharma", email: "sushil@hopespring.com", role: "Volunteer", joined: "2025-09-22", status: "Active" },
+    { name: "Mary Jones", email: "mary@hopespring.com", role: "Staff", joined: "2025-08-15", status: "Inactive" },
   ];
 
   const filteredUsers = users.filter(
