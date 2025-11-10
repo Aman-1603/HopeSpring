@@ -1,5 +1,6 @@
 import React from "react";
 import { Plus, Edit, Trash2, Eye } from "lucide-react";
+import AdminLayout from "./NavSection/AdminLayout";
 
 const programs = [
   { id: 1, name: "Yoga for Wellness", category: "Health", date: "Nov 15, 2025", participants: 42, status: "Ongoing" },
@@ -10,6 +11,7 @@ const programs = [
 
 const ActiveProgramsPage = () => {
   return (
+    <AdminLayout>
     <div className="min-h-screen bg-gradient-to-b from-[#f7f5fb] to-[#f3f0fa] p-8 space-y-8">
       {/* Header */}
       <div>
@@ -109,6 +111,7 @@ const ActiveProgramsPage = () => {
         </div>
       </div>
     </div>
+    </AdminLayout>
   );
 };
 
