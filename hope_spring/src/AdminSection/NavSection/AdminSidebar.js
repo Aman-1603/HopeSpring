@@ -16,13 +16,13 @@ import {
 
 const AdminSidebar = ({ isOpen, setIsOpen }) => {
   const navItems = [
-    { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
+    { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Users", path: "/admin/users", icon: Users },
-    { name: "Programs", path: "/admin/programs", icon: Calendar },
+    { name: "Programs", path: "/admin/add-programs", icon: Calendar },
     { name: "Donations", path: "/admin/donations", icon: DollarSign },
     { name: "Attendance", path: "/admin/attendance", icon: CheckSquare },
     { name: "Announcements", path: "/admin/announcements", icon: Megaphone },
-    { name: "Event Calendar", path: "/admin/calendar", icon: CalendarDays },
+    { name: "Event Calendar", path: "/admin/EventCalendar", icon: CalendarDays },
     { name: "Analytics", path: "/admin/analytics", icon: BarChart3 },
     { name: "Communication", path: "/admin/communication", icon: MessageSquare },
     { name: "Settings", path: "/admin/settings", icon: Settings },
