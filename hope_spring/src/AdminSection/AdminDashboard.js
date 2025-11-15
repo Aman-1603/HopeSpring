@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import AdminLayout from "./NavSection/AdminLayout"; // <-- wrap dashboard inside layout
 
 const donationData = [
   { month: "Jan", amount: 4000 },
@@ -34,6 +35,19 @@ const AdminDashboard = () => {
     { title: "Total Donations", value: "$28,500", icon: DollarSign, change: "+18%" },
     { title: "Avg. Attendance", value: "81%", icon: TrendingUp, change: "+5%" },
   ];
+
+  const quickActions = [
+    { label: "Add Program", icon: Calendar },
+    { label: "Add Event", icon: Calendar },
+    { label: "New Announcement", icon: Plus },
+  ];
+
+  const handleCardClick = (title) => {
+    if (title === "Total Users") navigate("/admin/users");
+    else if (title === "Active Programs") navigate("/admin/programs");
+    else if (title === "Total Donations") navigate("/admin/donations");
+    else if (title === "Avg. Attendance") navigate("/admin/attendance");
+  };
 
   return (
     <div className="space-y-8 p-6">

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Search, Plus, Download, Users, UserCheck, UserX, Calendar } from "lucide-react";
+import AdminLayout from "./NavSection/AdminLayout";
 
 const UsersPage = () => {
   const [search, setSearch] = useState("");
@@ -19,6 +20,7 @@ const UsersPage = () => {
   );
 
   return (
+    <AdminLayout>
     <div className="min-h-screen bg-gradient-to-b from-[#f7f5fb] to-[#f3f0fa] p-6 md:p-10 space-y-10">
       {/* Header */}
       <div>
@@ -140,6 +142,7 @@ const UsersPage = () => {
         </table>
       </div>
     </div>
+    </AdminLayout>
   );
 };
 
