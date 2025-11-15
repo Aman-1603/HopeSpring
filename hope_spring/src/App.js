@@ -48,6 +48,9 @@ import UsersPage from "./AdminSection/UsersPage";
 import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
 import AdminEventCalendar from "./AdminSection/AdminEventCalendar";
+import Announcements from "./AdminSection/Announcements";
+import AdminSettings from "./AdminSection/AdminSettings";
+
 
 export default function App() {
   const location = useLocation();
@@ -64,11 +67,22 @@ export default function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+
+          {/* Admin Section */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
+          <Route path="/admin/announcements" element={<Announcements />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
+          
+
+          {/* Auth / misc */}
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/bookprogram" element={<Book_Program />} />
           <Route path="/programs" element={<Programs />} />
+
 
           {/* Get Started */}
           <Route path="/get-started/living-with-cancer" element={<LivingWithCancer />} />
