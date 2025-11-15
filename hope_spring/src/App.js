@@ -47,6 +47,7 @@ import UsersPage from "./AdminSection/UsersPage";
 import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
 import Announcements from "./AdminSection/Announcements";
+import AdminSettings from "./AdminSection/AdminSettings";
 
 
 export default function App() {
@@ -64,6 +65,8 @@ export default function App() {
           <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
           <Route path="/admin/announcements" element={<Announcements />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
+          
 
           {/* Auth / misc */}
           <Route path="/register" element={<Register />} />
