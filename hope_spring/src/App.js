@@ -1,12 +1,11 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import Header from "./components/Header";
-import Footer from "./components/Footer";    
-import Newsletter from "./components/Newsletter";        
+import Footer from "./components/Footer";
+import Newsletter from "./components/Newsletter";
 
+// Public Pages
 import Home from "./components/Pages/Home";
-import Page from "./pages/Page";                     
-//import Meditation from "./pages/Programs/Meditation";
-
+import Page from "./pages/Page";
 import Register from "./components/Auth/Register";
 import Dashboard from "./components/Pages/Dashboard";
 import Login from "./components/Auth/Login";
@@ -42,22 +41,31 @@ import OurTeam from "./components/Pages/About/Team";
 import BoardOfDirectors from "./components/Pages/About/BDirector";
 import DonorPartners from "./components/Pages/About/Donor";
 import Reports from "./components/Pages/About/Report";
+
+// Admin Section
 import AdminDashboard from "./AdminSection/AdminDashboard";
 import UsersPage from "./AdminSection/UsersPage";
 import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
+import AdminEventCalendar from "./AdminSection/AdminEventCalendar";
 import Announcements from "./AdminSection/Announcements";
 import AdminSettings from "./AdminSection/AdminSettings";
 
 
 export default function App() {
+  const location = useLocation();
+
+  // ✅ Detect if current route is admin
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      {/* Show Header only on non-admin pages */}
+      {!isAdminRoute && <Header />}
 
       <main className="flex-1">
         <Routes>
-          {/* Home */}
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
 
           {/* Admin Section */}
@@ -77,7 +85,7 @@ export default function App() {
 
 
           {/* Get Started */}
-          <Route path="/get-started/living-with-cancer" element={<LivingWithCancer />}/>
+          <Route path="/get-started/living-with-cancer" element={<LivingWithCancer />} />
           <Route path="/get-started/caregiver-family" element={<CaregiverFamily />} />
           <Route path="/get-started/provider-partner" element={<ProviderPartner />} />
           <Route path="/get-started/give-or-volunteer" element={<GiveOrVolunteer />} />
@@ -85,8 +93,8 @@ export default function App() {
           {/* Get Free Support */}
           <Route path="/support/calendar" element={<Page title="View Calendar & Register" />} />
           <Route path="/support/programs" element={<Page title="Programs" />} />
-          <Route path="/support/programs/support-groups" element={<SupportGroups/>} />
-          <Route path="/support/programs/gentle-exercise/meditation" element={<MeditationProgramPage />} /> {/* real page */}
+          <Route path="/support/programs/support-groups" element={<SupportGroups />} />
+          <Route path="/support/programs/gentle-exercise/meditation" element={<MeditationProgramPage />} />
           <Route path="/support/programs/gentle-exercise/yoga" element={<YogaProgramPage />} />
           <Route path="/support/programs/gentle-exercise/tai-chi" element={<TaiChiProgramPage />} />
           <Route path="/support/programs/gentle-exercise/qi-gong" element={<QiGongProgramPage />} />
@@ -99,10 +107,8 @@ export default function App() {
           <Route path="/support/programs/relaxation/reiki" element={<Reiki />} />
           <Route path="/resources" element={<Resources />} />
 
-
           {/* Book a Service */}
           <Route path="/book/cancer-care-counselling" element={<CancerCareCounselling />} />
-          <Route path="/book/wigs-camisoles-headcovers" element={<Page title="Wigs, Camisoles, Headcovers" />} />
 
           {/* Get Involved */}
           <Route path="/donate" element={<Donate />} />
@@ -113,7 +119,6 @@ export default function App() {
           <Route path="/legacy-giving" element={<LegacyGiving />} />
 
           {/* About */}
-          <Route path="/get-inspired" element={<Page title="Get Inspired" />} />
           <Route path="/contact-us" element={<ContactUs />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/our-team" element={<OurTeam />} />
@@ -121,20 +126,26 @@ export default function App() {
           <Route path="/donors-and-partners" element={<DonorPartners />} />
           <Route path="/reports" element={<Reports />} />
 
+          {/* ===== ADMIN ROUTES ===== */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/add-programs" element={<ProgramManagement />} />
+          <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
+          <Route path="/admin/EventCalendar" element={<AdminEventCalendar />} />
 
-
-          {/* Admin Section */}
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<UsersPage />} />
-            <Route path="/admin/users" element={<UsersPage />} />
 
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
         </Routes>
       </main>
 
-      <Newsletter />
-      <Footer />   
+      {/* Show Footer only on non-admin pages */}
+      {!isAdminRoute && (
+        <>
+          <Newsletter />
+          <Footer />
+        </>
+      )}
     </div>
   );
 }

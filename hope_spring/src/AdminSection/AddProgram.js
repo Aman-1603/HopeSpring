@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AdminLayout from "./NavSection/AdminLayout";
 
 // mock data
 const initialCategories = [
@@ -9,6 +10,8 @@ const initialCategories = [
   "Counseling",
   "Exercise",
 ];
+
+
 
 const mockPrograms = [
   {
@@ -142,6 +145,7 @@ const ProgramManagement = () => {
   };
 
   return (
+    <AdminLayout>
     <div className="space-y-6">
       {/* header */}
       <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -433,6 +437,7 @@ const ProgramManagement = () => {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 };
 
