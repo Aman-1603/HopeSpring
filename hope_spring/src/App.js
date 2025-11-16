@@ -49,6 +49,8 @@ import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
 import AdminEventCalendar from "./AdminSection/AdminEventCalendar";
 import UserDashboard from "./user/UserDashboard";
+import AdminSettings from "./AdminSection/AdminSettings";
+import Announcements from "./AdminSection/Announcements";
 
 export default function App() {
   const location = useLocation();
@@ -119,8 +121,9 @@ export default function App() {
           <Route path="/admin/add-programs" element={<ProgramManagement />} />
           <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
           <Route path="/admin/EventCalendar" element={<AdminEventCalendar />} />
-         
-          {/* ===== User ROUTES ===== */}
+          <Route path="/admin/settings" element={<AdminSettings/>}/>
+          <Route path="/admin/announcements" element={<Announcements/>}/>         
+                {/* ===== User ROUTES ===== */}
           <Route path="/user/dashboard" element={<UserDashboard />} />
 
           {/* 404 */}
