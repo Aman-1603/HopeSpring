@@ -53,8 +53,8 @@ const Accordion = ({ items, defaultOpen = 0 }) => (
   </div>
 );
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?q=80&w=1920&auto=format&fit=crop";
+//const HERO_IMAGE =
+//  "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?q=80&w=1920&auto=format&fit=crop";
 
 const benefits = [
   {
@@ -81,8 +81,8 @@ const benefits = [
 ];
 
 const facilitators = [
-  { name: "Tammy", photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&q=80" },
-  { name: "Melissa", photo: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&q=80" },
+  { name: "Tammy", photo: "/images/facilitators/Tammy.png" },
+  { name: "Melissa", photo: "/images/facilitators/Melissa.png" },
 ];
 
 const hopespringPrograms = [
@@ -111,7 +111,7 @@ export default function YogaProgramPage() {
     <main className="min-h-screen bg-gray-50 text-gray-900">
       {/* Hero */}
       <section className="relative overflow-hidden" aria-labelledby="program-title">
-        <img src={HERO_IMAGE} alt="Yoga pose on mat" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/images/yoga-banner.png" alt="Yoga pose on mat" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         <div className="relative mx-auto max-w-6xl px-4 py-24 sm:py-28 lg:py-36">
           <div className="max-w-2xl text-white">
@@ -141,7 +141,7 @@ export default function YogaProgramPage() {
         <Card className="p-6 md:p-8">
           <div className="grid items-start gap-6 md:grid-cols-[340px,1fr]">
             <img
-              src="https://images.unsplash.com/photo-1552196566-3d4f2c6a1f1a?w=900&q=80"
+              src="/images/yoga-benefits.png"
               alt="Yoga class in studio"
               className="h-64 w-full rounded-xl object-cover md:h-full"
             />
@@ -200,7 +200,13 @@ export default function YogaProgramPage() {
 
       {/* FAQ placeholder */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
-        <div className="rounded-2xl bg-gray-100 p-8 text-center text-gray-500">Image placeholder</div>
+        <div className="rounded-2xl bg-gray-100 p-8 text-center text-gray-500">
+              <img
+      src="/images/yoga-suggestion.png"
+      alt="Person receiving support"
+      className="w-full h-full object-cover"
+    />
+        </div>
         <div>
           <h3 className="text-2xl font-semibold">Frequently Asked Questions</h3>
           <Accordion
@@ -233,7 +239,6 @@ export default function YogaProgramPage() {
       </section>
 
       <footer className="px-4 py-10 text-center text-xs text-gray-500">
-        HopeSpring Cancer Support Centre
       </footer>
     </main>
   );

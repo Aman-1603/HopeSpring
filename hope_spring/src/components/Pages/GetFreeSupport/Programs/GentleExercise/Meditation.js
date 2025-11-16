@@ -1,18 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-/**
- * Meditation Program Page
- * - Hero with CTA buttons
- * - Intro copy
- * - Benefits (icon list)
- * - Facilitators grid
- * - Explore programs (two accordions: HopeSpring + Community partners)
- * - FAQ placeholder
- * - Related programs
- *
- * TailwindCSS required. No third‑party UI libs used.
- */
+
 
 // --- Small, dependency-free UI primitives ---
 const Pill = ({ children }) => (
@@ -66,8 +55,8 @@ const Accordion = ({ items, defaultOpen = 0 }) => (
 );
 
 // --- Page data (replace with CMS / API later) ---
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?q=80&w=1920&auto=format&fit=crop";
+//const HERO_IMAGE =
+//  "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?q=80&w=1920&auto=format&fit=crop";
 
 const benefits = [
   {
@@ -97,9 +86,9 @@ const benefits = [
 ];
 
 const facilitators = [
-  { name: "Tammy", photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&q=80" },
-  { name: "Melissa", photo: "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&q=80" },
-  { name: "Kris & Vani", photo: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80" },
+  { name: "Tammy", img: "/images/facilitators/Tammy.png" },
+  { name: "Melissa", img: "/images/facilitators/Melissa.png" },
+  { name: "Kris & Vani", img: "/images/facilitators/Kris-and-Vani-1.png" },
 ];
 
 const hopespringPrograms = [
@@ -129,18 +118,21 @@ const related = [
     copy:
       "Improve strength, flexibility, and overall wellbeing with welcoming classes adapted for comfort.",
     img: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80",
+    to: "/support/programs/gentle-exercise/yoga"
   },
   {
     title: "Tai Chi",
     copy:
       "A mindful practice with flowing movements that combines balance and breath.",
     img: "https://images.unsplash.com/photo-1549576490-b0b4831ef60a?w=900&q=80",
+    to: "/support/programs/gentle-exercise/tai-chi"
   },
   {
     title: "Qi Gong",
     copy:
       "Ancient gentle movements and breathing techniques intended to cultivate and balance life energy.",
     img: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=900&q=80",
+    to: "/support/programs/gentle-exercise/qigong"
   },
 ];
 
@@ -153,7 +145,7 @@ export default function MeditationProgramPage() {
         aria-labelledby="program-title"
       >
         <img
-          src={HERO_IMAGE}
+          src="/images/meditation-banner.png"
           alt="Person meditating on a beach at sunrise"
           className="absolute inset-0 h-full w-full object-cover"
         />
@@ -188,7 +180,7 @@ export default function MeditationProgramPage() {
         <Card className="p-6 md:p-8">
           <div className="grid items-start gap-6 md:grid-cols-[340px,1fr]">
             <img
-              src="https://images.unsplash.com/photo-1519181245277-cffeb31da2fb?w=900&q=80"
+              src="/images/meditation-benefits.png"
               alt="Balanced stones near calm water"
               className="h-64 w-full rounded-xl object-cover md:h-full"
             />
@@ -219,7 +211,7 @@ export default function MeditationProgramPage() {
         <div className="mt-6 grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           {facilitators.map((f, i) => (
             <Card key={i} className="overflow-hidden">
-              <img src={f.photo} alt={f.name} className="h-56 w-full object-cover" />
+              <img src={f.img} alt={f.name} className="h-56 w-full object-cover" />
               <div className="bg-emerald-50 px-5 py-4">
                 <p className="font-semibold text-emerald-900">{f.name}</p>
               </div>
@@ -268,7 +260,7 @@ export default function MeditationProgramPage() {
       {/* FAQ placeholder + image */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
         <img
-          src="https://images.unsplash.com/photo-1552196573-3596686781b7?w=1000&q=80"
+          src="/images/faq-med.webp"
           alt="Seated meditation posture"
           className="h-96 w-full rounded-2xl object-cover"
         />
@@ -296,7 +288,8 @@ export default function MeditationProgramPage() {
                 <div className="space-y-2 p-5">
                   <p className="text-lg font-semibold">{r.title}</p>
                   <p className="text-sm text-gray-600">{r.copy}</p>
-                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button>
+                  <Link to={r.to}>
+                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button></Link>
                 </div>
               </Card>
             ))}

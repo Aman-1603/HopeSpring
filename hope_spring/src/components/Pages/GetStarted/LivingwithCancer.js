@@ -163,7 +163,7 @@ export default function LivingWithCancer() {
               Physical, Mental, and Spiritual Well-being
             </h3>
             <img
-              src="/images/s2.png"    // /public/images/portrait-smile.jpg
+              src="/images/s2.png"    
               alt="Participant smiling"
               className="mt-4 w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
@@ -196,14 +196,14 @@ export default function LivingWithCancer() {
               Our staff and volunteers provide personalized care and practical tools for your journey.
             </p>
             <img
-              src="/images/s3.png"      // /public/images/hands-flower.jpg
+              src="/images/s3.png"      
               alt="Hands holding flower"
               className="mt-5 w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
           </div>
           <div>
             <img
-              src="/images/s4.png"       // /public/images/ribbon-pink.jpg
+              src="/images/s4.png"       
               alt="Pink ribbon"
               className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />

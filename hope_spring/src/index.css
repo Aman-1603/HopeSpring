@@ -32,3 +32,29 @@ code {
     transform: translateX(-100%);
   }
 }
+
+.partner-marquee {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.partner-marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem; /* control space between logos */
+  animation: marquee-scroll 15s linear infinite;
+}
+
+.partner-marquee:hover .partner-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}

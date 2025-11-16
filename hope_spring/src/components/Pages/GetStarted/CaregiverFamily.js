@@ -86,7 +86,7 @@ export default function CaregiverFamily() {
         <div className="mx-auto max-w-6xl px-4 grid gap-8 md:grid-cols-2 items-start">
           <div>
             <img
-              src="/images/hope-lawn.jpg"       // /public/images/hope-lawn.jpg
+              src="/images/s1.png"       // /public/images/hope-lawn.jpg
               alt="HopeSpring community"
               className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
@@ -161,6 +161,11 @@ export default function CaregiverFamily() {
               Specialized Support for Caregivers, Supporters, and Family Members
               to help you cope, manage stress, and support your loved ones
             </h3>
+              <img
+              src="/images/second.png"    
+              alt="Participant smiling"
+              className="mt-4 w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
+            />
           </div>
 
           <ul className="grid gap-3">
@@ -190,8 +195,18 @@ export default function CaregiverFamily() {
               to support your well-being. Our programs help you maintain balance while supporting
               your loved one.
             </p>
+            <img
+              src="/images/s3.png"      
+              alt="Hands holding flower"
+              className="mt-5 w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
+            />
           </div>
           <div>
+            <img
+              src="/images/s4.png"       
+              alt="Pink ribbon"
+              className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
+            />
             <h4 className="text-lg md:text-xl font-semibold text-[#0b1c33]">Our Approach</h4>
             <p className="mt-2 text-gray-700">
               We offer practical resources and programs tailored to caregivers. Our holistic approach
