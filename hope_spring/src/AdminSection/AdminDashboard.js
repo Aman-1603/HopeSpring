@@ -41,12 +41,6 @@ const AdminDashboard = () => {
     { title: "Avg. Attendance", value: "81%", icon: TrendingUp, change: "+5%" },
   ];
 
-  const quickActions = [
-    { label: "Add Program", icon: Calendar },
-    { label: "Add Event", icon: Calendar },
-    { label: "New Announcement", icon: Plus },
-  ];
-
   const handleCardClick = (title) => {
     if (title === "Total Users") navigate("/admin/users");
     else if (title === "Active Programs") navigate("/admin/programs");
@@ -57,16 +51,29 @@ const AdminDashboard = () => {
   return (
     <AdminLayout>
       <div className="space-y-10 bg-gradient-to-b from-[#f7f5fb] to-[#f3f0fa] min-h-screen p-6">
-        {/* Header */}
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#7c6cf2] to-[#9b87f5] bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
             Dashboard Overview
           </h1>
           <p className="text-gray-500 mt-1">
-            Welcome back! Here's what's happening today.
+            Welcome back! Here’s what’s happening today.
           </p>
         </div>
 
+        {/* Add Program + Announcement buttons */}
+        <div className="flex gap-2">
+          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-400 text-white hover:opacity-90 transition-all">
+            <Calendar className="w-4 h-4" />
+            Add Program
+          </button>
+          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 transition-all">
+            <Plus className="w-4 h-4" />
+            New Announcement
+          </button>
+        </div>
+      </div>
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => (
@@ -148,24 +155,6 @@ const AdminDashboard = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-md">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-800">Quick Actions</h2>
-          </div>
-          <div className="p-6 flex flex-wrap gap-3">
-            {quickActions.map((action, index) => (
-              <button
-                key={index}
-                className="flex items-center px-5 py-2 bg-gradient-to-r from-[#67c6c6] to-[#5ab7b7] text-white font-medium rounded-lg hover:opacity-90 transition"
-              >
-                <action.icon className="w-4 h-4 mr-2" />
-                {action.label}
-              </button>
-            ))}
           </div>
         </div>
       </div>
