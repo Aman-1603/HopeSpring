@@ -1,0 +1,131 @@
+{
+  "menu": {
+    "common": {
+      "donate": "Donate",
+      "menu": "Menu",
+      "language": "Language"
+    },
+    "top": {
+      "getStarted": "Get Started",
+      "getFreeSupport": "Get Free Support",
+      "getInvolved": "Get Involved",
+      "getInspired": "Get Inspired",
+      "about": "About"
+    }
+  },
+  "topBar": {
+    "announcement": "All programs are offered free of charge for people affected by cancer and their loved ones."
+  },
+  "home": {
+    "hero": {
+      "weAreHereFor": "We are here for",
+      "everyone": "everyone",
+      "every": "every",
+      "cancerAnytime": "cancer. anytime.",
+      "body": "We are a community-based, charitable non-profit dedicated to supporting individuals impacted by cancer. Our mission is to empower and enhance emotional, physical, and mental well-being at every stage of the journey.",
+      "donateCta": "Donate",
+      "callCta": "519-742-4673"
+    },
+    "chipsBar": {
+      "title": "At HopeSpring, our doors are open to anyone. Period."
+    },
+    "chips": {
+      "thoseWithCancer": "Those with cancer",
+      "survivors": "Survivors",
+      "postCancer": "Post-cancer",
+      "children": "Children",
+      "family": "Family",
+      "caregivers": "Caregivers",
+      "healthcareProvider": "Healthcare provider"
+    },
+    "tiles": {
+      "livingWithCancer": "I am living with cancer or I am a survivor",
+      "caregiver": "I am a caregiver/supporter/family",
+      "partner": "I am a healthcare/community partner",
+      "giveVolunteer": "I want to give or volunteer",
+      "learnMore": "Learn more"
+    },
+    "cards": {
+      "sectionTitle": "Free support for patients, loved ones, and caregivers — every step of the journey",
+      "freeSupport": {
+        "title": "Free Support Services",
+        "text": "Counselling and practical programs to navigate challenges."
+      },
+      "freePrograms": {
+        "title": "Free Programs",
+        "text": "Exercise, meditation, family support, and more."
+      },
+      "resources": {
+        "title": "Community Resources",
+        "text": "Local groups and cancer-care information."
+      },
+      "imagePlaceholder": "Image",
+      "viewCta": "View →"
+    },
+    "video": {
+      "statHeadline": "2 in 5 Canadians are expected to be diagnosed with cancer in their lifetime.",
+      "missionHeadline": "We’re on a mission to inspire, empower, and give hope to lives.",
+      "body": "We know a cancer diagnosis can be a devastating experience; the emotional and sometimes financial strain can be as shattering as the physical disease itself. HopeSpring Cancer Support Centre exists to offer you information, emotional support, and the tools needed for empowerment, personal growth and self-help.",
+      "learnMoreCta": "Learn More about HopeSpring"
+    },
+    "partners": {
+      "body": "We are grateful for the support of our trusted partners who share our vision of empowering lives affected by cancer. Together, we create a network of care and compassion.",
+      "placeholder": "Partners logo area"
+    }
+  },
+  "footer": {
+    "getStarted": {
+      "title": "Get Started",
+      "livingWithCancer": "I am living with cancer",
+      "caregiversFamily": "Caregivers & family",
+      "healthcarePartners": "Healthcare partners",
+      "volunteerGive": "Volunteer / Give"
+    },
+    "freeSupport": {
+      "title": "Get Free Support",
+      "calendar": "Calendar & Register",
+      "programs": "Programs",
+      "resources": "Resources"
+    },
+    "getInvolved": {
+      "title": "Get Involved",
+      "donate": "Donate",
+      "becomeMember": "Become a Member",
+      "volunteer": "Volunteer",
+      "legacyGiving": "Legacy Giving"
+    },
+    "newsletter": {
+      "text": "Subscribe for updates on programs, events, and ways to help.",
+      "emailPlaceholder": "Email address",
+      "button": "Subscribe"
+    },
+    "bottom": {
+      "organisation": "HopeSpring Cancer Support Centre",
+      "about": "About",
+      "reports": "Reports",
+      "privacy": "Privacy Policy",
+      "terms": "Terms"
+    }
+  },
+  "newsletterSection": {
+  "hero": {
+    "title": "Subscribe to our Newsletter",
+    "blurb": "Stay updated on inspiring stories, upcoming events, and opportunities to make a difference. Join our community and receive weekly doses of inspiration in your inbox.",
+    "quote": "“Thank you for your dedication and lifting our spirits” – EK",
+    "imageAlt": "Preview of HopeSpring newsletter"
+  },
+  "card": {
+    "title": "Subscribe to our newsletter"
+  },
+  "form": {
+    "emailLabel": "Email Address",
+    "marketingPermissionsTitle": "Marketing Permissions",
+    "optionEmail": "Email",
+    "optionDirectMail": "Direct Mail",
+    "optionCustomAds": "Customized online advertising",
+    "disclaimer1": "You can change your mind at any time by clicking the unsubscribe link in the footer of any email you receive from us, or by contacting us at marketing@hopespring.ca. We will treat your information with respect.",
+    "disclaimer2": "We use Mailchimp as our marketing platform. By clicking below to subscribe, you acknowledge that your information will be transferred to Mailchimp for processing.",
+    "submit": "SUBSCRIBE"
+  }
+}
+}
