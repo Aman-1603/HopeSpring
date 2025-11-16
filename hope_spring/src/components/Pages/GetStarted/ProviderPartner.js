@@ -57,7 +57,7 @@ export default function ProviderPartner() {
           <div>
             {/* Replace with your photo: /public/images/hope-lawn.jpg */}
             <img
-              src="/images/hope-lawn.jpg"
+              src="/images/s1.png"
               alt="HopeSpring community"
               className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
             />
@@ -124,7 +124,7 @@ export default function ProviderPartner() {
         <div className="mx-auto max-w-6xl px-4 py-10 grid gap-8 md:grid-cols-2 items-center">
           {/* Replace with your event photo: /public/images/partner-tent.jpg */}
           <img
-            src="/images/partner-tent.jpg"
+            src="/images/main.png"
             alt="Community engagement"
             className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
           />
@@ -158,9 +158,9 @@ export default function ProviderPartner() {
             </p>
           </div>
 
-          {/* Replace with your asset: /public/images/hands-flower.jpg */}
+          
           <img
-            src="/images/hands-flower.jpg"
+            src="/images/s4.png"
             alt="Supportive care"
             className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
           />

@@ -17,10 +17,10 @@ export default function Home() {
   ];
 
   const tiles = [
-    { titleKey: "home.tiles.livingWithCancer", bg: "bg-[#ffe7b8]", to: "/get-started/living-with-cancer" },
-    { titleKey: "home.tiles.caregiver", bg: "bg-[#e1f5e6]", to: "/get-started/caregiver-family" },
-    { titleKey: "home.tiles.partner", bg: "bg-[#dff1ff]", to: "/get-started/provider-partner" },
-    { titleKey: "home.tiles.giveVolunteer", bg: "bg-[#e3e5ff]", to: "/get-started/give-or-volunteer" }
+    { titleKey: "home.tiles.livingWithCancer", bg: "bg-[#ffe7b8]", to: "/get-started/living-with-cancer", img:"/images/living-with-cancer.png" },
+    { titleKey: "home.tiles.caregiver", bg: "bg-[#e1f5e6]", to: "/get-started/caregiver-family", img: "/images/caregiver.png" },
+    { titleKey: "home.tiles.partner", bg: "bg-[#dff1ff]", to: "/get-started/provider-partner", img: "/images/healthcare.png" },
+    { titleKey: "home.tiles.giveVolunteer", bg: "bg-[#e3e5ff]", to: "/get-started/give-or-volunteer", img: "/images/volunteer.png" }
   ];
 
   const cards = [
@@ -265,27 +265,22 @@ export default function Home() {
     </p>
 
     <div className="rounded-xl bg-white/60 border border-gray-200 py-4 px-4">
-      {/* horizontal scroll container */}
-      <div
-        className="
-          flex items-center gap-6 
-          overflow-x-auto
-          [-ms-overflow-style:none] [scrollbar-width:none] 
-          [&::-webkit-scrollbar]:hidden
-        "
-      >
-        {partnerLogos.map((logo, idx) => (
-          <div
-            key={idx}
-            className="flex items-center justify-center shrink-0"
-          >
-            <img
-              src={logo.src}
-              alt={logo.alt}
-              className="h-10 md:h-12 w-auto object-contain"
-            />
-          </div>
-        ))}
+      {/* auto-scrolling marquee */}
+      <div className="partner-marquee">
+        <div className="partner-marquee-track">
+          {[...partnerLogos, ...partnerLogos].map((logo, idx) => (
+            <div
+              key={idx}
+              className="flex items-center justify-center shrink-0 px-8"
+            >
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                className="h-32 md:h-36 w-auto object-contain"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   </div>

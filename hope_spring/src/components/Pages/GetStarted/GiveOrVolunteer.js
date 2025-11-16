@@ -64,9 +64,8 @@ export default function GiveOrVolunteer() {
       {/* INTRO SPLIT */}
       <section className="py-6 md:py-10">
         <div className="mx-auto max-w-6xl px-4 grid gap-8 md:grid-cols-2 items-start">
-          {/* Replace with your photo: /public/images/hope-lawn.jpg */}
           <img
-            src="/images/hope-lawn.jpg"
+            src="/images/s1.png"
             alt="HopeSpring community"
             className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
           />
@@ -132,7 +131,7 @@ export default function GiveOrVolunteer() {
         <div className="mx-auto max-w-6xl px-4 py-10 grid gap-8 md:grid-cols-2 items-center">
           {/* Replace with your group photo: /public/images/volunteer-group.jpg */}
           <img
-            src="/images/volunteer-group.jpg"
+            src="/images/volunteer-one.png"
             alt="Volunteers"
             className="w-full rounded-2xl shadow-md ring-1 ring-black/10 object-cover"
           />

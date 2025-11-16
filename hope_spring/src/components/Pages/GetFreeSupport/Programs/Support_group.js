@@ -161,10 +161,10 @@ export default function SupportGroups() {
   ];
 
   const facilitators = [
-    { name: "Barbara", img: "/images/facilitators/barbara.jpg" },
-    { name: "Christine", img: "/images/facilitators/christine.jpg" },
-    { name: "Suzy", img: "/images/facilitators/suzy.jpg" },
-    { name: "Tammy", img: "/images/facilitators/tammy.jpg" },
+    { name: "Barbara", img: "/images/facilitators/barbara.png" },
+    { name: "Christine", img: "/images/facilitators/christina.png" },
+    { name: "Suzy", img: "/images/facilitators/suzy.png" },
+    { name: "Tammy", img: "/images/facilitators/Tammy.png" },
     // You can add a colored placeholder card if needed:
     // { name: "Men’s", img: "/images/facilitators/placeholder.jpg" },
   ];
@@ -188,11 +188,11 @@ export default function SupportGroups() {
   ];
 
   return (
-    <div className="pb-16">
+    <div className="pb-1">
       {/* HERO */}
       <section className="relative min-h-[320px] md:min-h-[380px]">
         <img
-          src="/images/support-hero.jpg"
+          src="/images/support-group-banner.png"
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -250,7 +250,7 @@ export default function SupportGroups() {
         </div>
 
         <div className="rounded-2xl overflow-hidden shadow-md">
-          <img src="/images/support-groups/people.jpg" alt="" className="w-full h-full object-cover" />
+          <img src="/images/support-group-benefits.png" alt="" className="w-full h-full object-cover" />
         </div>
       </section>
 
@@ -293,7 +293,7 @@ export default function SupportGroups() {
           <iframe
             className="w-full h-full"
             title="HopeSpring Support Groups"
-            src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+            src="https://youtu.be/w4MC1_rSNfA"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
@@ -316,18 +316,24 @@ export default function SupportGroups() {
 
       {/* FAQ */}
       <section className="max-w-6xl mx-auto px-4 py-10 grid gap-8 md:grid-cols-2">
-        <div className="rounded-2xl overflow-hidden shadow-md">
-          <img src="/images/support-groups/faq-image.jpg" alt="" className="w-full h-full object-cover" />
-        </div>
-        <div>
-          <SectionTitle title="Frequently Asked Questions" />
-          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
-            {faqs.map((f) => (
-              <FAQItem key={f.q} {...f} />
-            ))}
-          </div>
-        </div>
-      </section>
+  <div className="rounded-2xl overflow-hidden shadow-md">
+    <img
+      src="/images/faq-support.png"
+      alt="Person receiving support"
+      className="w-full h-full object-cover"
+    />
+  </div>
+
+  <div>
+    <SectionTitle title="Frequently Asked Questions" />
+    <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 divide-y divide-gray-100">
+      {faqs.map((f) => (
+        <FAQItem key={f.q} {...f} />
+      ))}
+    </div>
+  </div>
+</section>
+
 
       {/* YOU MAY ALSO LIKE */}
       <section className="bg-[#ff8a00]">
@@ -337,17 +343,17 @@ export default function SupportGroups() {
             {[
               {
                 title: "Cancer Care Counselling",
-                img: "/images/also-like/counselling.jpg",
+                img: "/images/Cancer-care-counselling-suggestion.png",
                 to: "/book/cancer-care-counselling",
               },
               {
                 title: "Reiki",
-                img: "/images/also-like/reiki.jpg",
+                img: "/images/reiki-suggestion.png",
                 to: "/support/programs/relaxation/reiki",
               },
               {
                 title: "Yoga",
-                img: "/images/also-like/yoga.jpg",
+                img: "/images/yoga-suggestion.png",
                 to: "/support/programs/gentle-exercise/yoga",
               },
             ].map((x) => (
