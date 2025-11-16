@@ -1,0 +1,131 @@
+{
+  "menu": {
+    "common": {
+      "donate": "Faire un don",
+      "menu": "Menu",
+      "language": "Langue"
+    },
+    "top": {
+      "getStarted": "Commencer",
+      "getFreeSupport": "Obtenir du soutien gratuit",
+      "getInvolved": "S'impliquer",
+      "getInspired": "S'inspirer",
+      "about": "À propos"
+    }
+  },
+  "topBar": {
+    "announcement": "Tous les programmes sont offerts gratuitement aux personnes touchées par le cancer et à leurs proches."
+  },
+  "home": {
+    "hero": {
+      "weAreHereFor": "Nous sommes là pour",
+      "everyone": "tout le monde",
+      "every": "tous les",
+      "cancerAnytime": "cancers. en tout temps.",
+      "body": "Nous sommes un organisme de bienfaisance communautaire dédié à soutenir les personnes touchées par le cancer. Notre mission est de favoriser le bien-être émotionnel, physique et mental à chaque étape du parcours.",
+      "donateCta": "Faire un don",
+      "callCta": "519-742-4673"
+    },
+    "chipsBar": {
+      "title": "À HopeSpring, nos portes sont ouvertes à tous. Point final."
+    },
+    "chips": {
+      "thoseWithCancer": "Personnes atteintes de cancer",
+      "survivors": "Survivants",
+      "postCancer": "Post-cancer",
+      "children": "Enfants",
+      "family": "Famille",
+      "caregivers": "Proches aidants",
+      "healthcareProvider": "Professionnels de la santé"
+    },
+    "tiles": {
+      "livingWithCancer": "Je vis avec le cancer ou je suis un survivant",
+      "caregiver": "Je suis un proche aidant/soutien/membre de la famille",
+      "partner": "Je suis un partenaire du milieu de la santé ou de la communauté",
+      "giveVolunteer": "Je souhaite donner ou faire du bénévolat",
+      "learnMore": "En savoir plus"
+    },
+    "cards": {
+      "sectionTitle": "Soutien gratuit pour les patients, leurs proches et les aidants — à chaque étape du parcours",
+      "freeSupport": {
+        "title": "Services de soutien gratuits",
+        "text": "Counseling et programmes pratiques pour faire face aux défis."
+      },
+      "freePrograms": {
+        "title": "Programmes gratuits",
+        "text": "Exercice, méditation, soutien familial et plus encore."
+      },
+      "resources": {
+        "title": "Ressources communautaires",
+        "text": "Groupes locaux et informations sur les soins contre le cancer."
+      },
+      "imagePlaceholder": "Image",
+      "viewCta": "Voir"
+    },
+    "video": {
+      "statHeadline": "Deux Canadiens sur cinq recevront un diagnostic de cancer au cours de leur vie.",
+      "missionHeadline": "Notre mission : inspirer, soutenir et redonner espoir.",
+      "body": "Nous savons qu’un diagnostic de cancer peut être bouleversant; le fardeau émotionnel et parfois financier peut être aussi écrasant que la maladie elle-même. HopeSpring Cancer Support Centre est là pour vous offrir de l’information, du soutien émotionnel et des outils pour l’autonomisation, la croissance personnelle et l’entraide.",
+      "learnMoreCta": "En savoir plus sur HopeSpring"
+    },
+    "partners": {
+      "body": "Nous sommes reconnaissants du soutien de nos partenaires de confiance qui partagent notre vision d’accompagner les personnes touchées par le cancer. Ensemble, nous créons un réseau de soins et de compassion.",
+      "placeholder": "Zone de logos de partenaires"
+    }
+  },
+  "footer": {
+    "getStarted": {
+      "title": "Commencer",
+      "livingWithCancer": "Je vis avec le cancer",
+      "caregiversFamily": "Proches aidants et famille",
+      "healthcarePartners": "Partenaires de soins de santé",
+      "volunteerGive": "Bénévolat / Dons"
+    },
+    "freeSupport": {
+      "title": "Obtenir du soutien gratuit",
+      "calendar": "Calendrier et inscription",
+      "programs": "Programmes",
+      "resources": "Ressources"
+    },
+    "getInvolved": {
+      "title": "S'impliquer",
+      "donate": "Faire un don",
+      "becomeMember": "Devenir membre",
+      "volunteer": "Bénévolat",
+      "legacyGiving": "Dons planifiés"
+    },
+    "newsletter": {
+      "text": "Abonnez-vous pour recevoir les nouveautés sur les programmes, les événements et les façons d'aider.",
+      "emailPlaceholder": "Adresse courriel",
+      "button": "S'abonner"
+    },
+    "bottom": {
+      "organisation": "HopeSpring Cancer Support Centre",
+      "about": "À propos",
+      "reports": "Rapports",
+      "privacy": "Politique de confidentialité",
+      "terms": "Conditions"
+    }
+  },
+  "newsletterSection": {
+  "hero": {
+    "title": "Abonnez-vous à notre infolettre",
+    "blurb": "Restez informé des histoires inspirantes, des événements à venir et des façons de faire une différence. Joignez-vous à notre communauté et recevez chaque semaine une dose d’inspiration dans votre boîte de réception.",
+    "quote": "« Merci pour votre dévouement et pour avoir remonté notre moral » – EK",
+    "imageAlt": "Aperçu de l’infolettre HopeSpring"
+  },
+  "card": {
+    "title": "Abonnement à l’infolettre"
+  },
+  "form": {
+    "emailLabel": "Adresse courriel",
+    "marketingPermissionsTitle": "Autorisations de marketing",
+    "optionEmail": "Courriel",
+    "optionDirectMail": "Publipostage",
+    "optionCustomAds": "Publicité en ligne personnalisée",
+    "disclaimer1": "Vous pouvez changer d’avis en tout temps en cliquant sur le lien de désabonnement au bas de nos courriels, ou en nous écrivant à marketing@hopespring.ca. Nous traiterons vos renseignements avec respect.",
+    "disclaimer2": "Nous utilisons Mailchimp comme plateforme de marketing. En cliquant ci-dessous pour vous abonner, vous reconnaissez que vos renseignements seront transférés à Mailchimp pour traitement.",
+    "submit": "S’ABONNER"
+  }
+}
+}
