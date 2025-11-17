@@ -11,11 +11,11 @@ import {
 
 /** Replace with your local assets if available */
 const heroImg =
-  "https://images.unsplash.com/photo-1585543530718-98629df2cf8b?q=80&w=1600&auto=format&fit=crop";
+  "/images/therapeutic-banner.png";
 const benefitsImg =
-  "https://images.unsplash.com/photo-1552693673-1bf958298935?q=80&w=1200&auto=format&fit=crop";
+  "/images/therapeutic-touch-benefits.png";
 const faqSideImg =
-  "https://images.unsplash.com/photo-1599058917212-d750089bc07b?q=80&w=1200&auto=format&fit=crop";
+  "/images/tt-suggestion.png";
 
 const youMayAlsoLike = [
   {
@@ -185,11 +185,11 @@ export default function TherapeuticTouch() {
         <div className="mt-8 grid gap-10 md:grid-cols-2">
           <PractitionerBadge
             name="Gloria"
-            img="https://images.unsplash.com/photo-1546527868-ccb7ee7dfa6a?q=80&w=900&auto=format&fit=crop"
+            img="/images/facilitators/gloria.png"
           />
           <PractitionerBadge
             name="Susanne"
-            img="https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=900&auto=format&fit=crop"
+            img="/images/facilitators/Susanne.png"
           />
         </div>
       </section>

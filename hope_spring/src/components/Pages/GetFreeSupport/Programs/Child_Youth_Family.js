@@ -154,7 +154,7 @@ export default function ChildrenYouthFamilyPage() {
       {/* HERO */}
       <section className="relative overflow-hidden">
         <img
-          src="https://images.unsplash.com/photo-1543258639-3b7d4fd3f6d9?w=1920&q=80"
+          src="/images/hopekidshero.svg"
           alt="Kids playing outdoors"
           className="absolute inset-0 h-full w-full object-cover"
         />

@@ -53,8 +53,8 @@ const Accordion = ({ items, defaultOpen = 0 }) => (
   </div>
 );
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1520975922284-5f92132f65b9?q=80&w=1920&auto=format&fit=crop";
+//const HERO_IMAGE =
+//  "https://images.unsplash.com/photo-1520975922284-5f92132f65b9?q=80&w=1920&auto=format&fit=crop";
 
 const benefits = [
   {
@@ -78,7 +78,7 @@ const benefits = [
 ];
 
 const facilitators = [
-  { name: "Judy", photo: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80" },
+  { name: "Judy", photo: "/images/facilitators/Judy.png" },
 ];
 
 const hopespringPrograms = [
@@ -91,9 +91,20 @@ const hopespringPrograms = [
 ];
 
 const related = [
-  { title: "Yoga", copy: "Improve strength, flexibility, and overall wellbeing with welcoming classes adapted for comfort." },
-  { title: "Meditation", copy: "Mindfulness exercises with encouragement to practice daily at home." },
-  { title: "Qi Gong", copy: "Gentle movements and breathing techniques to cultivate and balance energy (Qi)." },
+  { title: "Yoga",
+    copy: "Improve strength, flexibility, and overall wellbeing with welcoming classes adapted for comfort.",
+    img: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80",
+    to: "/support/programs/gentle-exercise/yoga"  },
+
+  { title: "Meditation", 
+    copy: "Mindfulness exercises with encouragement to practice daily at home.",
+    img: "/images/yoga-suggestion.png",
+    to: "/support/programs/gentle-exercise/meditation" },
+
+  { title: "Qi Gong", 
+    copy: "Gentle movements and breathing techniques to cultivate and balance energy (Qi).",
+    img: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=900&q=80",
+    to: "/support/programs/gentle-exercise/qigong" },
 ];
 
 export default function TaiChiProgramPage() {
@@ -101,7 +112,7 @@ export default function TaiChiProgramPage() {
     <main className="min-h-screen bg-gray-50 text-gray-900">
       {/* Hero */}
       <section className="relative overflow-hidden" aria-labelledby="program-title">
-        <img src={HERO_IMAGE} alt="Tai Chi outdoors" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/images/tai-chi-banner.png" alt="Tai Chi outdoors" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         <div className="relative mx-auto max-w-6xl px-4 py-24 sm:py-28 lg:py-36">
           <div className="max-w-2xl text-white">
@@ -199,7 +210,11 @@ export default function TaiChiProgramPage() {
 
       {/* FAQ placeholder */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
-        <div className="rounded-2xl bg-gray-100 p-8 text-center text-gray-500">Image placeholder</div>
+        <div className="rounded-2xl bg-gray-100 p-8 text-center text-gray-500"><img
+      src="/images/tai-chi-suggestion.png"
+      alt="Person receiving support"
+      className="w-full h-full object-cover"
+    /></div>
         <div>
           <h3 className="text-2xl font-semibold">Frequently Asked Questions</h3>
           <Accordion
@@ -219,11 +234,12 @@ export default function TaiChiProgramPage() {
           <div className="mt-6 grid gap-6 md:grid-cols-3">
             {related.map((r, i) => (
               <Card key={i} className="overflow-hidden">
-                <div className="h-48 w-full bg-amber-100" />
+                <img src={r.img} alt={r.title} className="h-48 w-full object-cover" />
                 <div className="space-y-2 p-5">
                   <p className="text-lg font-semibold">{r.title}</p>
                   <p className="text-sm text-gray-600">{r.copy}</p>
-                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button>
+                  <Link to={r.to}>
+                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button></Link>
                 </div>
               </Card>
             ))}
@@ -231,8 +247,8 @@ export default function TaiChiProgramPage() {
         </div>
       </section>
 
-      <footer className="px-4 py-10 text-center text-xs text-gray-500">
-        HopeSpring Cancer Support Centre
+      <footer className="px-4 py-0 text-center text-xs text-gray-500">
+      
       </footer>
     </main>
   );

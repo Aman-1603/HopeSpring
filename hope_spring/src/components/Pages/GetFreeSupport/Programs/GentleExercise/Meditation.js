@@ -297,8 +297,7 @@ export default function MeditationProgramPage() {
         </div>
       </section>
 
-      <footer className="px-4 py-10 text-center text-xs text-gray-500">
-        HopeSpring Cancer Support Centre
+      <footer className="px-4 py-0 text-center text-xs text-gray-500">
       </footer>
     </main>
   );

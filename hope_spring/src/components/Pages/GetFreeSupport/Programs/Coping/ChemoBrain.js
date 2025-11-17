@@ -63,8 +63,8 @@ const Accordion = ({ items, defaultOpen = 0 }) => (
   </div>
 );
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=1920&auto=format&fit=crop";
+//const HERO_IMAGE =
+//  "https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=1920&auto=format&fit=crop";
 
 const benefits = [
   {
@@ -87,7 +87,9 @@ const benefits = [
   },
 ];
 
-const facilitator = { name: "Michaela", photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80" };
+const facilitator = { 
+  name: "Michaela", 
+  photo: "/images/facilitators/Michaela.png" };
 
 const programItems = [
   {
@@ -116,19 +118,22 @@ const related = [
     title: "Support Groups",
     copy:
       "Facilitated groups that foster empathy, confidentiality, and mutual understanding.",
-    img: "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=1000&q=80",
+    img: "/images/support-groups-suggestion.png",
+    to: "/support/programs/support-groups",
   },
   {
     title: "Therapeutic Touch",
     copy:
       "A gentle technique focused on restoring balance and easing stress and anxiety.",
-    img: "https://images.unsplash.com/photo-1629904853893-c2c8981a1dc5?w=1000&q=80",
+    img: "/images/therupatic-theraphy.png",
+    to: "/support/programs/relaxation/therapeutic-touch",
   },
   {
     title: "Cancer Care Counselling",
     copy:
       "One‑on‑one counselling to navigate the challenges that come with a cancer diagnosis.",
-    img: "https://images.unsplash.com/photo-1523246192043-9531f2c9d95a?w=1000&q=80",
+    img: "/images/Cancer-care-counselling-suggestion.png",
+    to: "/cancer-care-counselling",
   },
 ];
 
@@ -137,7 +142,7 @@ export default function ChemoBrainProgramPage() {
     <main className="min-h-screen bg-gray-50 text-gray-900">
       {/* Hero */}
       <section className="relative overflow-hidden" aria-labelledby="program-title">
-        <img src={HERO_IMAGE} alt="Person reflecting on a sofa" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/images/chemo-banner.png" alt="Person reflecting on a sofa" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         <div className="relative mx-auto max-w-6xl px-4 py-24 sm:py-28 lg:py-36">
           <div className="max-w-2xl text-white">
@@ -170,7 +175,7 @@ export default function ChemoBrainProgramPage() {
         <Card className="p-6 md:p-8">
           <div className="grid items-start gap-6 md:grid-cols-[340px,1fr]">
             <img
-              src="https://images.unsplash.com/photo-1477332552946-cfb384aeaf1c?w=900&q=80"
+              src="/images/chemo-brain-benefits.png"
               alt="Caregiver with child smiling on couch"
               className="h-64 w-full rounded-xl object-cover md:h-full"
             />
@@ -222,7 +227,7 @@ export default function ChemoBrainProgramPage() {
       {/* FAQ placeholder */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
         <img
-          src="https://images.unsplash.com/photo-1559070224-87c4c1a6b4f9?w=1000&q=80"
+          src="/images/Chemo-suggestion.png"
           alt="Person sitting and reflecting"
           className="h-80 w-full rounded-2xl object-cover"
         />
@@ -249,7 +254,8 @@ export default function ChemoBrainProgramPage() {
                 <div className="space-y-2 p-5">
                   <p className="text-lg font-semibold">{r.title}</p>
                   <p className="text-sm text-gray-600">{r.copy}</p>
-                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button>
+                  <Link to={r.to}>
+                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button></Link>
                 </div>
               </Card>
             ))}
@@ -257,7 +263,7 @@ export default function ChemoBrainProgramPage() {
         </div>
       </section>
 
-      <footer className="px-4 py-10 text-center text-xs text-gray-500">HopeSpring Cancer Support Centre</footer>
+      <footer className="px-4 py-0 text-center text-xs text-gray-500"></footer>
     </main>
   );
 }

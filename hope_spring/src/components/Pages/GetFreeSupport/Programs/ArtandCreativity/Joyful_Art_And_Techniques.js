@@ -107,7 +107,7 @@ export default function JoyfulArtSkillsTechniquesPage() {
         <Card className="p-6 md:p-8">
           <div className="grid items-start gap-6 md:grid-cols-[340px,1fr]">
             <img
-              src="https://images.unsplash.com/photo-1526318472351-c75fcf070305?w=1000&q=80"
+              src="/images/art-technique-banner.png"
               alt="Brush on vibrant canvas"
               className="h-64 w-full rounded-xl object-cover md:h-full"
             />
@@ -135,7 +135,7 @@ export default function JoyfulArtSkillsTechniquesPage() {
         <Card className="mx-auto mt-6 grid max-w-md items-center gap-4 p-4">
           <div className="flex gap-4">
             <img
-              src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=800&q=80"
+              src="/images/facilitators/Char.png"
               alt="Char Heaman"
               className="h-24 w-24 rounded-lg object-cover"
             />
@@ -187,7 +187,7 @@ export default function JoyfulArtSkillsTechniquesPage() {
       {/* FAQ + image */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
         <img
-          src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=1000&q=80"
+          src="/images/art-technique-suggestion.png"
           alt="Giraffe collage on table"
           className="h-80 w-full rounded-2xl object-cover"
         />
@@ -216,19 +216,26 @@ export default function JoyfulArtSkillsTechniquesPage() {
             {[{
               title: "Joyful art practice",
               copy: "Monthly creative sessions mixing art skills with stress‑relieving mindfulness.",
+              img: "",
+              to: "/support/programs/arts-creativity/joyful-art-practice",
             },{
               title: "Tai Chi",
               copy: "Gentle, flowing movement combined with breath to support balance and calm.",
+              img: "https://images.unsplash.com/photo-1549576490-b0b4831ef60a?w=900&q=80",
+              to: "/support/programs/gentle-exercise/tai-chi",
             },{
               title: "Qi Gong",
               copy: "Ancient practice combining movement, breath, and focus for well‑being.",
+              img: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=900&q=80",
+              to: "/support/programs/gentle-exercise/qigong"
             }].map((r, i) => (
               <Card key={i} className="overflow-hidden">
-                <div className="h-48 w-full bg-white/60" />
+                <img src={r.img} alt={r.title} className="h-48 w-full object-cover" />
                 <div className="space-y-2 p-5">
                   <p className="text-lg font-semibold">{r.title}</p>
                   <p className="text-sm text-gray-600">{r.copy}</p>
-                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button>
+                  <Link to={r.to}>
+                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button></Link>
                 </div>
               </Card>
             ))}
@@ -236,7 +243,7 @@ export default function JoyfulArtSkillsTechniquesPage() {
         </div>
       </section>
 
-      <footer className="px-4 py-10 text-center text-xs text-gray-500">HopeSpring Cancer Support Centre</footer>
+      <footer className="px-4 py-0 text-center text-xs text-gray-500"></footer>
     </main>
   );
 }
