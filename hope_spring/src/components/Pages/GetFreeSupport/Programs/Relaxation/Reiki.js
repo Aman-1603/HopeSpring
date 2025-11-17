@@ -11,11 +11,11 @@ import {
 
 /* Replace these with local assets if you have them */
 const heroImg =
-  "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1600&auto=format&fit=crop";
+  "/images/reiki-banner.png";
 const benefitsImg =
-  "https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=1200&auto=format&fit=crop";
+  "/images/reiki-benefits.png";
 const faqSideImg =
-  "https://images.unsplash.com/photo-1599058917212-d750089bc07b?q=80&w=1200&auto=format&fit=crop";
+  "/images/reiki-suggestion.png";
 
 const youMayAlsoLike = [
   {
@@ -165,19 +165,19 @@ export default function Reiki() {
         <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <PractitionerBadge
             name="Juliette"
-            img="https://images.unsplash.com/photo-1546527868-ccb7ee7dfa6a?q=80&w=900&auto=format&fit=crop"
+            img="/images/facilitators/juliette.png"
           />
           <PractitionerBadge
             name="Linda"
-            img="https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=900&auto=format&fit=crop"
+            img="/images/facilitators/Linda.png"
           />
           <PractitionerBadge
             name="Peter"
-            img="https://images.unsplash.com/photo-1542042161784-26ab9e041e96?q=80&w=900&auto=format&fit=crop"
+            img="/images/facilitators/Peter.png"
           />
           <PractitionerBadge
             name="Rebecca"
-            img="https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=900&auto=format&fit=crop"
+            img="/images/facilitators/Rebecca.png"
           />
         </div>
 

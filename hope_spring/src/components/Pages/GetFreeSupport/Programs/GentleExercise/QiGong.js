@@ -53,8 +53,8 @@ const Accordion = ({ items, defaultOpen = 0 }) => (
   </div>
 );
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1549576496-7712f8f6c095?q=80&w=1920&auto=format&fit=crop";
+//const HERO_IMAGE =
+//  "https://images.unsplash.com/photo-1549576496-7712f8f6c095?q=80&w=1920&auto=format&fit=crop";
 
 const benefits = [
   {
@@ -77,7 +77,7 @@ const benefits = [
   },
 ];
 
-const facilitator = { name: "Joel", photo: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&q=80" };
+const facilitator = { name: "Joel", photo: "/images/facilitators/Joel.png" };
 
 const hopespringPrograms = [
   {
@@ -89,9 +89,21 @@ const hopespringPrograms = [
 ];
 
 const related = [
-  { title: "Tai Chi", copy: "Mind‑body practice with flowing movements combining breath and balance.", img: "https://images.unsplash.com/photo-1549576490-b0b4831ef60a?w=900&q=80" },
-  { title: "Yoga", copy: "Improve strength, flexibility, and overall wellbeing with welcoming classes.", img: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80" },
-  { title: "Meditation", copy: "Mindfulness exercises with encouragement to practice daily at home.", img: "https://images.unsplash.com/photo-1519181245277-cffeb31da2fb?w=900&q=80" },
+  { title: "Tai Chi", 
+    copy: "Mind‑body practice with flowing movements combining breath and balance.", 
+    img: "https://images.unsplash.com/photo-1549576490-b0b4831ef60a?w=900&q=80" ,
+    to: "/support/programs/gentle-exercise/tai-chi"},
+
+  { title: "Yoga", 
+    copy: "Improve strength, flexibility, and overall wellbeing with welcoming classes.", 
+    img: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=900&q=80",
+    to: "/support/programs/gentle-exercise/yoga" },
+
+
+  { title: "Meditation", 
+    copy: "Mindfulness exercises with encouragement to practice daily at home.", 
+    img: "/images/yoga-suggestion.png",
+    to: "/support/programs/gentle-exercise/meditation" },
 ];
 
 export default function QiGongProgramPage() {
@@ -99,7 +111,7 @@ export default function QiGongProgramPage() {
     <main className="min-h-screen bg-gray-50 text-gray-900">
       {/* Hero */}
       <section className="relative overflow-hidden" aria-labelledby="program-title">
-        <img src={HERO_IMAGE} alt="Qi Gong practice outdoors" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/images/qi-gong-banner.png" alt="Qi Gong practice outdoors" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         <div className="relative mx-auto max-w-6xl px-4 py-24 sm:py-28 lg:py-36">
           <div className="max-w-2xl text-white">
@@ -196,7 +208,7 @@ export default function QiGongProgramPage() {
       {/* FAQ placeholder */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
         <img
-          src="https://images.unsplash.com/photo-1547333776-0440eaf78acb?w=1000&q=80"
+          src="/images/qi-suggestion.webp"
           alt="Qi Gong class movement"
           className="h-96 w-full rounded-2xl object-cover"
         />
@@ -223,7 +235,8 @@ export default function QiGongProgramPage() {
                 <div className="space-y-2 p-5">
                   <p className="text-lg font-semibold">{r.title}</p>
                   <p className="text-sm text-gray-600">{r.copy}</p>
-                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button>
+                  <Link to={r.to}>
+                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button></Link>
                 </div>
               </Card>
             ))}
@@ -231,8 +244,8 @@ export default function QiGongProgramPage() {
         </div>
       </section>
 
-      <footer className="px-4 py-10 text-center text-xs text-gray-500">
-        HopeSpring Cancer Support Centre
+      <footer className="px-4 py-0 text-center text-xs text-gray-500">
+        
       </footer>
     </main>
   );

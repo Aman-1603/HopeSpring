@@ -11,31 +11,31 @@ import {
 
 /** Replace these with your real asset imports if you have them */
 const heroImg =
-  "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=1400&auto=format&fit=crop";
+  "/images/massage-therapy-banner.png";
 const benefitsImg =
-  "https://images.unsplash.com/photo-1552693673-1bf958298935?q=80&w=1200&auto=format&fit=crop";
+  "/images/massage-therapy-benefits.png";
 const faqSideImg =
-  "https://images.unsplash.com/photo-1606131731446-5568d9c4b1f7?q=80&w=1200&auto=format&fit=crop";
+  "/images/massage-therapy-suggestion.png";
 
 const youMayAlsoLike = [
   {
     title: "Reiki",
-    to: "/programs/reiki",
-    img: "https://images.unsplash.com/photo-1584483766114-2cea6facdf57?q=80&w=1200&auto=format&fit=crop",
+    img: "/images/reiki-suggestion.png",
+    to: "/support/programs/relaxation/reiki",
     blurb:
       "An ancient healing technique focused on channeling energy to specific areas of the body.",
   },
   {
     title: "Therapeutic Touch",
-    to: "/programs/therapeutic-touch",
-    img: "https://images.unsplash.com/photo-1599058917212-d750089bc07b?q=80&w=1200&auto=format&fit=crop",
+    img: "/images/therupatic-theraphy.png",
+    to: "/support/programs/relaxation/therapeutic-touch",
     blurb:
       "A gentle technique that supports relaxation and balance, delivered by an experienced practitioner.",
   },
   {
     title: "Meditation",
-    to: "/programs/meditation",
-    img: "https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?q=80&w=1200&auto=format&fit=crop",
+    img: "/images/yoga-suggestion.png",
+    to: "/support/programs/gentle-exercise/meditation" ,
     blurb:
       "Mindfulness exercises to reduce stress and support daily well-being; encouraged as a home practice.",
   },
@@ -80,7 +80,7 @@ const PractitionerCard = ({ name, children, tone = "emerald" }) => (
     <div className="flex items-center gap-4">
       <div className="h-16 w-16 overflow-hidden rounded-xl">
         <img
-          src="https://i.pravatar.cc/160?img=12"
+          src="/images/facilitators/Ian.png"
           alt={`${name} portrait`}
           className="h-full w-full object-cover"
         />

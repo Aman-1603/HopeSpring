@@ -44,8 +44,8 @@ const Card = ({ children, className = "" }) => (
   <div className={`rounded-2xl border border-gray-200 bg-white shadow-sm ${className}`}>{children}</div>
 );
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1920&auto=format&fit=crop";
+//const HERO_IMAGE =
+//  "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1920&auto=format&fit=crop";
 
 const objectives = [
   {
@@ -67,7 +67,7 @@ const objectives = [
 
 const facilitator = {
   name: "Char Heaman",
-  photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=800&q=80",
+  photo: "/images/facilitators/Char.png",
   bio: (
     <>
       Many people who see my work make assumptions about me; primarily that I have been painting for years and that I have
@@ -103,16 +103,22 @@ const related = [
     title: "Joyful art skills and techniques",
     copy:
       "Learn a variety of art techniques including drawing, painting, and collage, plus mindfulness and breathing exercises.",
+      img: "",
+      to: "",
   },
   {
     title: "Cancer Care Counselling",
     copy:
       "Guidance and strategies to navigate the challenges that come with a cancer diagnosis.",
+      img: "/images/Cancer-care-counselling-suggestion.png",
+      to: "/book/cancer-care-counselling"
   },
   {
     title: "Art Night for kids after school",
     copy:
       "A playful creative space for children to express emotions and connect through art.",
+      img: "",
+      to: "/support/programs/arts-creativity/joyful-art-practice",
   },
 ];
 
@@ -121,7 +127,7 @@ export default function JoyfulArtPracticePage() {
     <main className="min-h-screen bg-gray-50 text-gray-900">
       {/* Hero */}
       <section className="relative overflow-hidden" aria-labelledby="program-title">
-        <img src={HERO_IMAGE} alt="Coloured pencils" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/images/art-practice-banner.png" alt="Coloured pencils" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         <div className="relative mx-auto max-w-6xl px-4 py-24 sm:py-28 lg:py-36">
           <div className="max-w-2xl text-white">
@@ -153,7 +159,7 @@ export default function JoyfulArtPracticePage() {
         <Card className="p-6 md:p-8">
           <div className="grid items-start gap-6 md:grid-cols-[340px,1fr]">
             <img
-              src="https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1000&q=80"
+              src="/images/art-benefits.png"
               alt="Paint brushes with orange paint"
               className="h-64 w-full rounded-xl object-cover md:h-full"
             />
@@ -215,7 +221,7 @@ export default function JoyfulArtPracticePage() {
       {/* FAQ placeholder */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
         <img
-          src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1000&q=80"
+          src="/images/joyful-suggestion.png"
           alt="Assorted art brushes"
           className="h-80 w-full rounded-2xl object-cover"
         />
@@ -243,11 +249,12 @@ export default function JoyfulArtPracticePage() {
           <div className="mt-6 grid gap-6 md:grid-cols-3">
             {related.map((r, i) => (
               <Card key={i} className="overflow-hidden">
-                <div className="h-48 w-full bg-white/60" />
+                <img src={r.img} alt={r.title} className="h-48 w-full object-cover" />
                 <div className="space-y-2 p-5">
                   <p className="text-lg font-semibold">{r.title}</p>
                   <p className="text-sm text-gray-600">{r.copy}</p>
-                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button>
+                  <Link to={r.to}>
+                  <Button variant="outline" className="mt-2 w-fit">Learn more</Button></Link>
                 </div>
               </Card>
             ))}
@@ -255,7 +262,7 @@ export default function JoyfulArtPracticePage() {
         </div>
       </section>
 
-      <footer className="px-4 py-10 text-center text-xs text-gray-500">HopeSpring Cancer Support Centre</footer>
+      <footer className="px-4 py-0 text-center text-xs text-gray-500"></footer>
     </main>
   );
 }
