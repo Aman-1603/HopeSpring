@@ -1,7 +1,9 @@
 import { Save, Upload, Download } from "lucide-react";
+import AdminLayout from "./NavSection/AdminLayout";
 
 const AdminSettings = () => {
   return (
+    <AdminLayout>
     <div className="space-y-6 p-6">
       {/* Page Header */}
       <div>
@@ -141,6 +143,7 @@ const AdminSettings = () => {
         </div>
       </div>
     </div>
+    </AdminLayout>
   );
 };
 
