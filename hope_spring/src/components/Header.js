@@ -3,8 +3,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import LanguageDropdown from "./LanguageDropdown";
+import axios from "axios";
+import { Bell } from "lucide-react";
 
-/** ---------- MENU DATA ---------- */
+/* -------------------------------- MENU DATA -------------------------------- */
 const MENU = [
   {
     key: "getStarted",
@@ -35,10 +37,7 @@ const MENU = [
             ]
           },
           { label: "Children/Youth/Families", to: "/support/programs/children-youth-families" },
-          {
-            label: "Coping",
-            children: [{ label: "Chemo brain", to: "/support/programs/coping/chemo-brain" }]
-          },
+          { label: "Coping", children: [{ label: "Chemo brain", to: "/support/programs/coping/chemo-brain" }] },
           {
             label: "Arts and Creativity",
             children: [
@@ -98,160 +97,222 @@ const MENU = [
   }
 ];
 
-/** active helper */
+/* ---------------------------- Active route helper --------------------------- */
 function hasActiveDescendant(item, pathname) {
   if (item.to && pathname.startsWith(item.to)) return true;
   if (!item.children) return false;
   return item.children.some((c) => hasActiveDescendant(c, pathname));
 }
 
+/* --------------------------------- HEADER --------------------------------- */
 export default function Header() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const navRef = useRef(null);
   const { pathname } = useLocation();
   const { t } = useTranslation();
 
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navRef = useRef(null);
+
+  /* -------------------- NOTIFICATIONS (Announcements) -------------------- */
+  const [notifications, setNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+
+  useEffect(() => {
+    const loadAnnouncements = async () => {
+      try {
+        const res = await axios.get("/api/announcements");
+        setNotifications(res.data.filter((a) => a.published));
+      } catch (err) {
+        console.warn("⚠ Backend offline — showing empty announcements");
+        setNotifications([]);
+      }
+    };
+    loadAnnouncements();
+  }, []);
+
+  const notifRef = useRef();
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotif(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  /* --------------------------- Escape key closes menu --------------------------- */
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setMobileOpen(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  /* --------------------- Close mobile when clicking outside -------------------- */
   useEffect(() => {
     const onClick = (e) => {
-      if (mobileOpen && navRef.current && !navRef.current.contains(e.target)) setMobileOpen(false);
+      if (mobileOpen && navRef.current && !navRef.current.contains(e.target)) {
+        setMobileOpen(false);
+      }
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [mobileOpen]);
 
+  /* -------------------------------------------------------------------------- */
+  /*                                   RENDER                                   */
+  /* -------------------------------------------------------------------------- */
+
   return (
-    <header className="sticky top-0 z-50 isolate bg-white/80 backdrop-blur border-b border-gray-200">
-      {/* Top utility bar (desktop only): left = marquee area, right = language */}
-{/* Top utility bar (desktop only): left = marquee, right = language */}
-<div className="hidden md:block border-b border-gray-200 bg-white/90">
-  <div className="mx-auto max-w-6xl h-9 px-4 flex items-center justify-between gap-4">
-    {/* Left: scrolling announcement */}
-    <div className="flex-1 text-xs text-gray-700 marquee">
-      <div className="marquee-inner">
-        {t("topBar.announcement")}
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-200">
+
+      {/* --------------------------- TOP UTILITY BAR --------------------------- */}
+      <div className="hidden md:block border-b border-gray-200 bg-white/90">
+        <div className="mx-auto max-w-6xl h-9 px-4 flex items-center justify-between">
+          <div className="flex-1 text-xs text-gray-700 marquee">
+            <div className="marquee-inner">{t("topBar.announcement")}</div>
+          </div>
+          <LanguageDropdown />
+        </div>
       </div>
-    </div>
 
-    {/* Right: language selector */}
-    <LanguageDropdown />
-  </div>
-</div>
-
-
-      {/* Main header row */}
+      {/* ------------------------------- MAIN ROW ------------------------------ */}
       <div className="mx-auto max-w-6xl h-16 px-4 flex items-center justify-between">
-        <Link
-          to="/"
-          aria-label="HopeSpring Home"
-          className="block w-[210px] md:w-[240px] lg:w-[260px] h-12 md:h-14"
-        >
-          <img src="/images/logo2.png" alt="HopeSpring" className="w-full h-full object-contain" />
+
+        {/* LOGO */}
+        <Link to="/" className="block w-[210px] md:w-[240px] h-12">
+          <img src="/images/logo2.png" alt="HopeSpring Logo" className="w-full h-full object-contain" />
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* ------------------------------ DESKTOP NAV ----------------------------- */}
+        <nav className="hidden md:flex items-center justify-between flex-1">
+
+          {/* LEFT SIDE — Donate + Menu */}
+          <div className="flex items-center gap-6">
+
+            {/* DONATE BUTTON */}
+            <NavLink
+              to="/donate"
+              className="rounded-xl bg-[#0e2340] text-white px-4 py-2 text-sm font-semibold shadow-sm hover:brightness-110"
+            >
+              {t("menu.common.donate")}
+            </NavLink>
+
+            {/* MENU */}
+            <ul className="flex items-center gap-2 text-[15px] text-[#0b1c33]">
+              {MENU.map((item, i) => {
+                const active = hasActiveDescendant(item, pathname);
+                const label = item.key ? t(`menu.top.${item.key}`) : item.label;
+
+                return (
+                  <li key={i} className="relative group">
+                    {item.children ? (
+                      <button
+                        className={`flex items-center gap-1 px-3 py-2 hover:text-black ${
+                          active ? "text-black font-semibold" : ""
+                        }`}
+                      >
+                        {label}
+                        <svg
+                          className={`h-3.5 w-3.5 transition-transform ${
+                            active ? "rotate-180" : "group-hover:rotate-180"
+                          }`}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
+                          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `px-3 py-2 hover:text-black ${
+                            isActive ? "text-black font-semibold underline underline-offset-4" : ""
+                          }`
+                        }
+                      >
+                        {label}
+                      </NavLink>
+                    )}
+
+                    {item.children && (
+                      <div
+                        className="absolute left-0 top-full pt-2 opacity-0 translate-y-1 pointer-events-none
+                                   group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto
+                                   transition"
+                      >
+                        <DesktopMenuPanel items={item.children} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* RIGHT SIDE — Notification Bell */}
+          <div className="relative ml-6" ref={notifRef}>
+            <button
+              onClick={() => setShowNotif((prev) => !prev)}
+              className="relative p-2 hover:bg-gray-100 rounded-full"
+            >
+              <Bell className="w-6 h-6 text-gray-700" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+              )}
+            </button>
+
+            {showNotif && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border rounded-xl shadow-xl z-50 p-4">
+                <h3 className="font-semibold text-gray-800 mb-2">Announcements</h3>
+
+                {notifications.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No announcements available</p>
+                ) : (
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
+                    {notifications.map((n) => (
+                      <div key={n.id} className="border-b pb-2 last:border-none">
+                        <p className="font-semibold">{n.title}</p>
+                        <p className="text-sm text-gray-600">{n.description}</p>
+                        {n.link && (
+                          <a href={n.link} className="text-indigo-600 text-sm">
+                            View →
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+        </nav>
+
+        {/* ------------------------------ MOBILE MENU BUTTON ----------------------------- */}
+        <button
+          className="md:hidden inline-flex items-center gap-2 rounded-lg border px-3 py-2"
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          Menu
+        </button>
+
+      </div>
+
+      {/* ------------------------------- MOBILE MENU ------------------------------ */}
+      <div
+        ref={navRef}
+        className={`md:hidden bg-white overflow-hidden transition ${mobileOpen ? "max-h-[80vh]" : "max-h-0"}`}
+      >
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <LanguageDropdown />
           <NavLink
             to="/donate"
-            className="mr-3 rounded-xl bg-[#0e2340] text-white px-4 py-2 text-sm font-semibold shadow-sm hover:brightness-110"
+            className="block mt-3 rounded-xl bg-[#0e2340] text-white px-4 py-2 text-sm font-semibold"
           >
             {t("menu.common.donate")}
           </NavLink>
 
-          <ul className="flex items-center gap-2 text-[15px] text-[#0b1c33]">
-            {MENU.map((item, i) => {
-              const active = hasActiveDescendant(item, pathname);
-              const label = item.key ? t(`menu.top.${item.key}`) : item.label;
-
-              return (
-                <li key={i} className="relative group">
-                  {item.children ? (
-                    <button
-                      type="button"
-                      className={`flex items-center gap-1 px-3 py-2 hover:text-black ${
-                        active ? "text-black font-semibold" : ""
-                      }`}
-                      aria-haspopup="true"
-                      aria-expanded={active}
-                    >
-                      {label}
-                      <svg
-                        className={`h-3.5 w-3.5 transition-transform ${
-                          active ? "rotate-180" : "group-hover:rotate-180"
-                        }`}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <NavLink
-                      to={item.to}
-                      end
-                      className={({ isActive }) =>
-                        `px-3 py-2 hover:text-black ${
-                          isActive ? "text-black font-semibold underline underline-offset-4" : ""
-                        }`
-                      }
-                    >
-                      {label}
-                    </NavLink>
-                  )}
-
-                  {/* level-1 dropdown (open on hover) */}
-                  {item.children && (
-                    <div
-                      className="absolute left-0 top-full z-[60] pt-2
-                                 opacity-0 translate-y-1 pointer-events-none
-                                 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto
-                                 transition"
-                    >
-                      <DesktopMenuPanel items={item.children} />
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        {/* Mobile toggle */}
-        <button
-          className="md:hidden inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-          aria-label="Menu Toggle"
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen((v) => !v)}
-        >
-          {t("menu.common.menu")}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Mobile drawer */}
-      <div
-        ref={navRef}
-        className={`md:hidden border-top border-gray-200 bg-white transition-[max-height] overflow-hidden ${
-          mobileOpen ? "max-h-[80vh]" : "max-h-0"
-        }`}
-      >
-        <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="mb-3 flex items-center justify-between">
-            <LanguageDropdown />
-            <NavLink
-              to="/donate"
-              className="inline-block rounded-xl bg-[#0e2340] text-white px-4 py-2 text-sm font-semibold shadow-sm"
-            >
-              {t("menu.common.donate")}
-            </NavLink>
-          </div>
           <MobileMenu items={MENU} />
         </div>
       </div>
@@ -259,14 +320,14 @@ export default function Header() {
   );
 }
 
-/* ---------- Desktop dropdown panel ---------- */
+/* ------------------------------- DESKTOP SUBMENUS ------------------------------- */
 function DesktopMenuPanel({ items }) {
-  const [openIdx, setOpenIdx] = React.useState(null);
+  const [openIdx, setOpenIdx] = useState(null);
 
   return (
-    <ul className="relative min-w-[240px] rounded-xl border border-gray-200 bg-white shadow-lg p-2 overflow-visible">
+    <ul className="relative min-w-[240px] rounded-xl border bg-white shadow-lg p-2">
       {items.map((it, idx) => {
-        const hasChildren = !!it.children;
+        const hasChildren = it.children;
         const isOpen = openIdx === idx;
 
         return (
@@ -274,37 +335,23 @@ function DesktopMenuPanel({ items }) {
             key={idx}
             className="relative"
             onMouseEnter={() => hasChildren && setOpenIdx(idx)}
-            onMouseLeave={() => hasChildren && setOpenIdx((v) => (v === idx ? null : v))}
+            onMouseLeave={() => hasChildren && setOpenIdx(null)}
           >
             {hasChildren ? (
-              <button
-                type="button"
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50"
-                aria-haspopup="true"
-                aria-expanded={isOpen}
-              >
-                <span>{it.label}</span>
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <button className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-gray-50">
+                {it.label}
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                   <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" />
                 </svg>
               </button>
             ) : (
-              <NavLink
-                to={it.to}
-                end
-                className={({ isActive }) =>
-                  `block px-3 py-2 rounded-lg hover:bg-gray-50 ${
-                    isActive ? "bg-gray-100 font-semibold text-[#0b1c33]" : ""
-                  }`
-                }
-                onMouseEnter={() => setOpenIdx(null)}
-              >
+              <NavLink to={it.to} className="block px-3 py-2 rounded-lg hover:bg-gray-50">
                 {it.label}
               </NavLink>
             )}
 
             {hasChildren && isOpen && (
-              <div className="absolute left-full top-0 z-[60] pl-2">
+              <div className="absolute left-full top-0 pl-2 z-[60]">
                 <DesktopMenuPanel items={it.children} />
               </div>
             )}
@@ -315,46 +362,35 @@ function DesktopMenuPanel({ items }) {
   );
 }
 
-/* ---------- Mobile accordion ---------- */
+/* ------------------------------- MOBILE MENU ------------------------------- */
 function MobileMenu({ items, level = 0 }) {
   const [openIndex, setOpenIndex] = useState(null);
 
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-1 mt-3">
       {items.map((it, idx) => {
-        const hasChildren = !!it.children;
-        const isOpen = openIndex === idx;
+        const open = openIndex === idx;
+        const hasChildren = it.children;
+
         return (
-          <li key={`${level}-${idx}`} className="border border-gray-200 rounded-lg">
-            <div className="flex items-center justify-between">
+          <li key={idx} className="border rounded-lg">
+            <div className="flex justify-between items-center">
               {!hasChildren ? (
-                <NavLink
-                  to={it.to}
-                  end
-                  className={({ isActive }) => `flex-1 px-3 py-2.5 ${isActive ? "font-semibold text-[#0b1c33]" : ""}`}
-                >
+                <NavLink to={it.to} className="flex-1 px-3 py-2.5">
                   {it.label}
                 </NavLink>
               ) : (
-                <button
-                  className="flex-1 text-left px-3 py-2.5"
-                  onClick={() => setOpenIndex(isOpen ? null : idx)}
-                  aria-expanded={isOpen}
-                >
+                <button className="flex-1 text-left px-3 py-2.5" onClick={() => setOpenIndex(open ? null : idx)}>
                   {it.label}
                 </button>
               )}
+
               {hasChildren && (
-                <button
-                  className="px-3 py-2.5"
-                  onClick={() => setOpenIndex(isOpen ? null : idx)}
-                  aria-label="Toggle submenu"
-                >
+                <button className="px-3 py-2.5" onClick={() => setOpenIndex(open ? null : idx)}>
                   <svg
-                    className={`transition ${isOpen ? "rotate-180" : ""}`}
+                    className={`transition ${open ? "rotate-180" : ""}`}
                     width="18"
                     height="18"
-                    viewBox="0 0 24 24"
                     fill="none"
                   >
                     <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
@@ -362,11 +398,10 @@ function MobileMenu({ items, level = 0 }) {
                 </button>
               )}
             </div>
-            {hasChildren && (
-              <div className={`overflow-hidden transition-[max-height] ${isOpen ? "max-h-96" : "max-h-0"}`}>
-                <div className="p-2">
-                  <MobileMenu items={it.children} level={level + 1} />
-                </div>
+
+            {hasChildren && open && (
+              <div className="p-2">
+                <MobileMenu items={it.children} level={level + 1} />
               </div>
             )}
           </li>

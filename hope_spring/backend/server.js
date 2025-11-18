@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { pool } from "./db.js";
 import programRoutes from "./routes/programRoutes.js";
+import announcementRoutes from "./routes/announcements.js";
 
 dotenv.config();
 
@@ -21,8 +22,13 @@ app.use(cors({
   credentials: true,
 }));
 
-
 app.use(express.json());
+//for the annoucment section
+
+app.use("/api/announcements", announcementRoutes);
+
+
+
 
 /* ------------------------------------------
     HEALTH CHECK
