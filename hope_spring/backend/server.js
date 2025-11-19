@@ -1,4 +1,4 @@
-// server.js - KEEPING WILDCARD CORS
+// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -13,32 +13,34 @@ dotenv.config();
 const app = express();
 
 /* ------------------------------------------
-    CRITICAL: CORS FIX (Wildcard is safest for Codespaces)
+   CORS
 -------------------------------------------*/
-app.use(cors({
-  origin: "*", 
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
-//for the annoucment section
 
-app.use("/api/announcements", announcementRoutes);
-
-
-
+/* 🔍 GLOBAL REQUEST LOGGER – this will show EVERY hit */
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.url}`);
+  next();
+});
 
 /* ------------------------------------------
-    HEALTH CHECK
+   HEALTH CHECK
 -------------------------------------------*/
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
 /* ------------------------------------------
-    AUTH ROUTES (REGISTER + LOGIN)
+   AUTH ROUTES (REGISTER + LOGIN)
 -------------------------------------------*/
 
 // REGISTER
@@ -61,8 +63,8 @@ app.post("/api/register", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO users(name,email,password,role)
-        VALUES ($1,$2,$3,$4)
-        RETURNING id,name,email,role`,
+       VALUES ($1,$2,$3,$4)
+       RETURNING id,name,email,role`,
       [name, email, hashed, role || "member"]
     );
 
@@ -124,12 +126,155 @@ app.post("/api/login", async (req, res) => {
 });
 
 /* ------------------------------------------
-    PROGRAM ROUTES
+   🔥 DEBUG CAL.COM WEBHOOK — logs everything
 -------------------------------------------*/
-app.use("/api/programs", programRoutes);
+
+app.post("/api/cal/webhook", async (req, res) => {
+  try {
+    console.log("🔥 Incoming Cal webhook");
+    console.log("Headers:", JSON.stringify(req.headers, null, 2));
+    console.log("Body:", JSON.stringify(req.body, null, 2));
+
+    const payload = req.body;
+
+    const trigger =
+      payload.triggerEvent ||
+      payload.trigger ||
+      payload.type ||
+      "UNKNOWN_TRIGGER";
+
+    const event =
+      payload.data ||
+      payload.payload ||
+      payload.event ||
+      payload.booking ||
+      payload;
+
+    console.log("Trigger:", trigger);
+
+    const calBookingId = event.id || event.uid || event.bookingId || null;
+
+    const attendee = (event.attendees && event.attendees[0]) || {};
+    const attendeeName = attendee.name || event.name || "Unknown";
+    const attendeeEmail = attendee.email || event.email || "unknown@example.com";
+
+    const eventStart = event.startTime || event.start || null;
+    const eventEnd = event.endTime || event.end || null;
+
+    console.log("calBookingId:", calBookingId);
+    console.log("attendee:", attendeeName, attendeeEmail);
+    console.log("eventStart:", eventStart, "eventEnd:", eventEnd);
+
+    const insertBooking = `
+      INSERT INTO bookings (
+        program_id,
+        user_id,
+        cal_booking_id,
+        attendee_name,
+        attendee_email,
+        status,
+        event_start,
+        event_end,
+        created_at
+      )
+      VALUES (NULL, NULL, $1, $2, $3, 'confirmed', $4, $5, NOW())
+      ON CONFLICT (cal_booking_id) DO NOTHING
+      RETURNING *;
+    `;
+
+    const params = [
+      calBookingId,
+      attendeeName,
+      attendeeEmail,
+      eventStart ? new Date(eventStart) : null,
+      eventEnd ? new Date(eventEnd) : null,
+    ];
+
+    const result = await pool.query(insertBooking, params);
+    console.log("✅ Booking insert result:", result.rows);
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("💥 Cal webhook error:", err);
+    return res.json({ success: false });
+  }
+});
 
 /* ------------------------------------------
-    START SERVER
+   ADMIN AUTH
+-------------------------------------------*/
+function requireAdmin(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: "No token provided" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded || decoded.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Forbidden (admin only)" });
+    }
+
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error("Admin auth error:", err);
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired token" });
+  }
+}
+
+/* ------------------------------------------
+   LIST BOOKINGS (ADMIN)
+-------------------------------------------*/
+app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        b.id,
+        b.cal_booking_id,
+        b.attendee_name,
+        b.attendee_email,
+        b.status,
+        b.event_start,
+        b.event_end,
+        b.created_at,
+        p.id AS program_id,
+        p.title AS program_title,
+        p.category AS program_category
+      FROM bookings b
+      LEFT JOIN programs p ON p.id = b.program_id
+      ORDER BY b.event_start DESC NULLS LAST, b.created_at DESC
+      `
+    );
+
+    res.json({ success: true, bookings: result.rows });
+  } catch (err) {
+    console.error("Failed to fetch bookings:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch bookings" });
+  }
+});
+
+/* ------------------------------------------
+   PROGRAM + ANNOUNCEMENT ROUTES
+-------------------------------------------*/
+app.use("/api/programs", programRoutes);
+app.use("/api/announcements", announcementRoutes);
+
+/* ------------------------------------------
+   START SERVER
 -------------------------------------------*/
 const PORT = process.env.PORT || 5000;
 

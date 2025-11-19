@@ -23,11 +23,16 @@ const Register = () => {
     e.preventDefault();
     setError("");
 
-    if (!form.email || !form.password) return setError("Email and password are required.");
-    if (form.password !== form.confirm) return setError("Passwords do not match.");
+    if (!form.email || !form.password) {
+      return setError("Email and password are required.");
+    }
+    if (form.password !== form.confirm) {
+      return setError("Passwords do not match.");
+    }
 
     try {
       setBusy(true);
+
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,13 +44,25 @@ const Register = () => {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "Registration failed.");
+      // ---- SAFE PARSE: handle proxy / non-JSON responses ----
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        // Not JSON – likely a proxy error page or plain-text error
+        throw new Error(text || "Unexpected server error during registration.");
+      }
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Registration failed.");
+      }
 
       alert("✅ Account created successfully!");
       navigate("/login");
     } catch (err) {
-      setError(err.message);
+      console.error("Register error:", err);
+      setError(err.message || "Registration failed.");
     } finally {
       setBusy(false);
     }
@@ -56,7 +73,12 @@ const Register = () => {
       <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-10 md:p-12 w-full max-w-md sm:max-w-lg md:max-w-xl text-center transition-all duration-300">
         {/* Logo */}
         <div className="flex justify-center mb-5 sm:mb-6">
-          <img src="/images/logo2.png" alt="HopeSpring Logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+          {/* use your SVG logo, or keep the PNG if you prefer */}
+          <img
+            src={HopeSpringLogo}
+            alt="HopeSpring Logo"
+            className="w-14 h-14 sm:w-20 sm:h-20 object-contain"
+          />
         </div>
 
         {/* Title */}
@@ -78,7 +100,9 @@ const Register = () => {
         <form className="text-left space-y-5 sm:space-y-6" onSubmit={onSubmit}>
           {/* Full Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Full Name
+            </label>
             <input
               name="name"
               type="text"
@@ -91,7 +115,9 @@ const Register = () => {
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Address
+            </label>
             <input
               name="email"
               type="email"
@@ -105,7 +131,9 @@ const Register = () => {
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Password
+            </label>
             <input
               name="password"
               type="password"
@@ -119,7 +147,9 @@ const Register = () => {
 
           {/* Confirm Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Confirm Password
+            </label>
             <input
               name="confirm"
               type="password"
@@ -133,7 +163,9 @@ const Register = () => {
 
           {/* Role Selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">I am a...</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              I am a...
+            </label>
             <select
               name="role"
               value={form.role}
@@ -141,7 +173,9 @@ const Register = () => {
               className="w-full px-4 py-2 sm:px-5 sm:py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#a88ff0] text-gray-700 text-sm sm:text-base"
               required
             >
-              <option value="" disabled>Select your role</option>
+              <option value="" disabled>
+                Select your role
+              </option>
               <option value="member">Member</option>
               <option value="volunteer">Volunteer</option>
               <option value="staff">Staff</option>
@@ -162,7 +196,10 @@ const Register = () => {
         {/* Footer */}
         <div className="mt-8 sm:mt-10 border-t pt-4 sm:pt-5 text-sm sm:text-base text-gray-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-[#9b87f5] font-semibold hover:underline">
+          <Link
+            to="/login"
+            className="text-[#9b87f5] font-semibold hover:underline"
+          >
             Sign In
           </Link>
         </div>
