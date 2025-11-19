@@ -48,6 +48,7 @@ import UsersPage from "./AdminSection/UsersPage";
 import ProgramManagement from "./AdminSection/AddProgram";
 import ActiveProgramsPage from "./AdminSection/ActiveProgramsPage";
 import AdminEventCalendar from "./AdminSection/AdminEventCalendar";
+import UserDashboard from "./user/UserDashboard";
 import AdminSettings from "./AdminSection/AdminSettings";
 import Announcements from "./AdminSection/Announcements";
 
@@ -121,8 +122,10 @@ export default function App() {
           <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
           <Route path="/admin/EventCalendar" element={<AdminEventCalendar />} />
           <Route path="/admin/settings" element={<AdminSettings/>}/>
-          <Route path="/admin/announcements" element={<Announcements/>}/>
-      
+          <Route path="/admin/announcements" element={<Announcements/>}/>         
+                {/* ===== User ROUTES ===== */}
+          <Route path="/user/dashboard" element={<UserDashboard />} />
+
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
         </Routes>
