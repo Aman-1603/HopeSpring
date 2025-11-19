@@ -7,6 +7,8 @@ import jwt from "jsonwebtoken";
 import { pool } from "./db.js";
 import programRoutes from "./routes/programRoutes.js";
 import announcementRoutes from "./routes/announcements.js";
+import userRoutes from "./routes/userRoutes.js";
+
 
 dotenv.config();
 
@@ -26,6 +28,8 @@ app.use(express.json());
 //for the annoucment section
 
 app.use("/api/announcements", announcementRoutes);
+app.use("/api/users", userRoutes);
+
 
 
 
