@@ -51,6 +51,7 @@ import AdminEventCalendar from "./AdminSection/AdminEventCalendar";
 import UserDashboard from "./user/UserDashboard";
 import AdminSettings from "./AdminSection/AdminSettings";
 import Announcements from "./AdminSection/Announcements";
+import UserLayout from "./user/components/UserLayout";
 
 export default function App() {
   const location = useLocation();
@@ -124,7 +125,7 @@ export default function App() {
           <Route path="/admin/settings" element={<AdminSettings/>}/>
           <Route path="/admin/announcements" element={<Announcements/>}/>         
                 {/* ===== User ROUTES ===== */}
-          <Route path="/user/dashboard" element={<UserDashboard />} />
+          <Route path="/user/dashboard" element={<UserLayout><UserDashboard /></UserLayout>} />
 
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
