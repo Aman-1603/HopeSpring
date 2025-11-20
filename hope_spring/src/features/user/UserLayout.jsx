@@ -1,6 +1,6 @@
 // UserLayout.js
 import React, { useState } from "react";
-import AppSidebar from "../../components/shared/AppSidebar";
+import AppSidebar from "../../components/layout/AppSidebar";
 import { User, History, ShoppingBag, House } from "lucide-react";
 
 const userNavItems = [

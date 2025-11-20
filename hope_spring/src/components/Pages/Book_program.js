@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
-import CalendarPicker from "../../ui/CalenderPicker.jsx";
+import CalendarPicker from "../CalenderPicker"
 
 // ⛳️ Mock: replace with your auth/user context later
 const mockUser = {

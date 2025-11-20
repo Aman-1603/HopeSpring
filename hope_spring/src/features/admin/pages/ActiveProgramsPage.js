@@ -1,6 +1,6 @@
 import React from "react";
 import { Plus, Edit, Trash2, Eye } from "lucide-react";
-import AdminLayout from "./NavSection/AdminLayout";
+import AdminLayout from "../AdminLayout";
 
 const programs = [
   { id: 1, name: "Yoga for Wellness", category: "Health", date: "Nov 15, 2025", participants: 42, status: "Ongoing" },

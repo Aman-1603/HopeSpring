@@ -3,7 +3,7 @@ import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { Plus, X, CalendarDays, Clock } from "lucide-react";
-import AdminLayout from "./NavSection/AdminLayout";
+import AdminLayout from "../AdminLayout";
 
 // === date-fns localizer setup ===
 const locales = {

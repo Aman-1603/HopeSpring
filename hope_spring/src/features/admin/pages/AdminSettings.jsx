@@ -1,5 +1,5 @@
 import { Save, Upload, Download } from "lucide-react";
-import AdminLayout from "./NavSection/AdminLayout";
+import AdminLayout from "../AdminLayout";
 
 const AdminSettings = () => {
   return (

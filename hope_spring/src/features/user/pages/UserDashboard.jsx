@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import UserHeader from './components/UserHeader';
-import MyPrograms from './components/MyPrograms';
-import AnnouncementsFeed from './components/AnnouncementsFeed';
-import Recommendations from './components/Recommendations';
+import UserHeader from '../components/UserHeader';
+import MyPrograms from '../components/MyPrograms';
+import AnnouncementsFeed from '../components/AnnouncementsFeed';
+import Recommendations from '../components/Recommendations';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import UserLayout from '../UserLayout';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
@@ -110,6 +111,7 @@ const UserDashboard = () => {
   };
 
   return (
+    <UserLayout>
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <UserHeader 
@@ -128,6 +130,7 @@ const UserDashboard = () => {
         </div>
       </div>
     </div>
+    </UserLayout>
   );
 };
 
