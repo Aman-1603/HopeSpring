@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 /** Small atoms */
@@ -13,20 +13,33 @@ const Badge = ({ children }) => (
 
 const SectionTitle = ({ kicker, title, desc }) => (
   <div className="space-y-2">
-    {kicker && <p className="uppercase tracking-wide text-[12px] text-gray-500">{kicker}</p>}
+    {kicker && (
+      <p className="uppercase tracking-wide text-[12px] text-gray-500">
+        {kicker}
+      </p>
+    )}
     <h2 className="text-2xl md:text-3xl font-bold text-[#0b1c33]">{title}</h2>
     {desc && <p className="text-gray-600 max-w-2xl">{desc}</p>}
   </div>
 );
 
-const ProgramCard = ({ title, summary, day, time, facilitator, href = "/support/calendar" }) => (
+const ProgramCard = ({
+  title,
+  summary,
+  day,
+  time,
+  facilitator,
+  href = "/support/calendar",
+}) => (
   <article className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5 shadow-sm hover:shadow-md transition">
     <div className="flex flex-wrap items-center gap-2 mb-2">
       {day && <Badge>{day}</Badge>}
       {time && <Badge>{time}</Badge>}
     </div>
     <h3 className="font-semibold text-lg text-[#0b1c33]">{title}</h3>
-    {facilitator && <p className="text-sm text-gray-500 mb-2">with {facilitator}</p>}
+    {facilitator && (
+      <p className="text-sm text-gray-500 mb-2">with {facilitator}</p>
+    )}
     <p className="text-gray-700 text-[15px] leading-relaxed">{summary}</p>
     <Link
       to={href}
@@ -37,14 +50,12 @@ const ProgramCard = ({ title, summary, day, time, facilitator, href = "/support/
   </article>
 );
 
-const FacilitatorCard = ({ name, img = "/images/facilitators/placeholder.jpg", color }) => (
-  <div
-    className={`rounded-2xl overflow-hidden border border-gray-200 shadow-sm ${
-      color ? `bg-[${color}]` : "bg-white"
-    }`}
-  >
+const FacilitatorCard = ({
+  name,
+  img = "/images/facilitators/placeholder.jpg",
+}) => (
+  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
     <div className="aspect-[1/1] w-full bg-gray-100">
-      {/* Replace placeholder path(s) with real images in /public/images/facilitators */}
       <img src={img} alt={name} className="w-full h-full object-cover" />
     </div>
     <div className="p-3 text-center">
@@ -71,8 +82,53 @@ const FAQItem = ({ q, a }) => {
           <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
         </svg>
       </button>
-      <div className={`grid overflow-hidden transition-[grid-template-rows] ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+      <div
+        className={`grid overflow-hidden transition-[grid-template-rows] ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
         <div className="overflow-hidden pb-4 text-gray-600">{a}</div>
+      </div>
+    </div>
+  );
+};
+
+/** Cal booking modal – full/near-full screen */
+const CalBookingModal = ({ open, onClose, name, email }) => {
+  if (!open) return null;
+
+  const params = new URLSearchParams();
+  params.set("embed", "1");
+  if (name) params.set("name", name);
+  if (email) params.set("email", email);
+
+  const src = `https://cal.com/kamutest/newtestevent?${params.toString()}`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+      <div className="relative w-[95vw] h-[95vh] bg-white rounded-2xl overflow-hidden shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 inline-flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm w-10 h-10 hover:bg-slate-50"
+          aria-label="Close booking"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-700">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        <iframe
+          title="Book a support group session"
+          src={src}
+          className="w-full h-full border-0"
+          loading="lazy"
+        />
       </div>
     </div>
   );
@@ -165,8 +221,6 @@ export default function SupportGroups() {
     { name: "Christine", img: "/images/facilitators/christina.png" },
     { name: "Suzy", img: "/images/facilitators/suzy.png" },
     { name: "Tammy", img: "/images/facilitators/Tammy.png" },
-    // You can add a colored placeholder card if needed:
-    // { name: "Men’s", img: "/images/facilitators/placeholder.jpg" },
   ];
 
   const faqs = [
@@ -187,6 +241,21 @@ export default function SupportGroups() {
     },
   ];
 
+  // 🔹 Pull logged-in user from localStorage so Cal can prefill
+  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("hsUser");
+      if (!raw) return;
+      const user = JSON.parse(raw);
+      setLoggedInUser(user);
+    } catch (e) {
+      console.error("Failed to parse hsUser from localStorage", e);
+    }
+  }, []);
+
   return (
     <div className="pb-1">
       {/* HERO */}
@@ -199,18 +268,24 @@ export default function SupportGroups() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/20 to-transparent" />
         <div className="relative max-w-6xl mx-auto px-4 py-12 md:py-16">
           <div className="max-w-xl text-white">
-            <p className="uppercase tracking-wide text-[12px] opacity-90">Programs</p>
-            <h1 className="text-3xl md:text-5xl font-extrabold leading-tight">Support Groups</h1>
-            <p className="mt-3 text-white/90">
-              Free, professionally facilitated groups for patients, survivors, and caregivers. Connect with
-              others, share experiences, and build resilience — at any stage of the cancer journey.
+            <p className="uppercase tracking-wide text-[12px] opacity-90">
+              Programs
             </p>
-            <Link
-              to="/support/calendar"
+            <h1 className="text-3xl md:text-5xl font-extrabold leading-tight">
+              Support Groups
+            </h1>
+            <p className="mt-3 text-white/90">
+              Free, professionally facilitated groups for patients, survivors,
+              and caregivers. Connect with others, share experiences, and build
+              resilience — at any stage of the cancer journey.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsBookingOpen(true)}
               className="mt-5 inline-block rounded-lg bg-emerald-500 text-white font-semibold px-5 py-2.5 hover:bg-emerald-600"
             >
-              Find a group
-            </Link>
+              Book a group
+            </button>
           </div>
         </div>
       </section>
@@ -225,9 +300,10 @@ export default function SupportGroups() {
             />
           </div>
           <div className="text-gray-700 leading-relaxed">
-            Each of our support groups is facilitated by trained professionals, focusing on connection,
-            education, and practical tools for navigating the cancer experience. Whether you’re newly diagnosed,
-            in treatment, or supporting someone you love, you are welcome here.
+            Each of our support groups is facilitated by trained professionals,
+            focusing on connection, education, and practical tools for
+            navigating the cancer experience. Whether you’re newly diagnosed, in
+            treatment, or supporting someone you love, you are welcome here.
           </div>
         </div>
       </section>
@@ -241,7 +317,10 @@ export default function SupportGroups() {
           />
           <div className="mt-4 space-y-3">
             {benefits.map((b) => (
-              <div key={b.title} className="rounded-xl border border-gray-200 p-4">
+              <div
+                key={b.title}
+                className="rounded-xl border border-gray-200 p-4"
+              >
                 <p className="font-semibold text-[#0b1c33]">{b.title}</p>
                 <p className="text-gray-700 text-[15px] mt-1">{b.text}</p>
               </div>
@@ -250,7 +329,11 @@ export default function SupportGroups() {
         </div>
 
         <div className="rounded-2xl overflow-hidden shadow-md">
-          <img src="/images/support-group-benefits.png" alt="" className="w-full h-full object-cover" />
+          <img
+            src="/images/support-group-benefits.png"
+            alt=""
+            className="w-full h-full object-cover"
+          />
         </div>
       </section>
 
@@ -293,7 +376,7 @@ export default function SupportGroups() {
           <iframe
             className="w-full h-full"
             title="HopeSpring Support Groups"
-            src="https://youtu.be/w4MC1_rSNfA"
+            src="https://www.youtube.com/embed/w4MC1_rSNfA"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
@@ -301,9 +384,11 @@ export default function SupportGroups() {
         <div className="flex flex-col justify-center">
           <h3 className="text-2xl font-bold text-[#0b1c33]">What to expect</h3>
           <p className="text-gray-700 mt-2 leading-relaxed">
-            Expect a supportive and compassionate environment where you can share at your own pace.
-            Our group guidelines help create an atmosphere of respect and confidentiality. Sessions often include
-            check-ins, topic discussions, gentle practices, and resource sharing.
+            Expect a supportive and compassionate environment where you can
+            share at your own pace. Our group guidelines help create an
+            atmosphere of respect and confidentiality. Sessions often include
+            check-ins, topic discussions, gentle practices, and resource
+            sharing.
           </p>
           <Link
             to="/support/calendar"
@@ -316,29 +401,30 @@ export default function SupportGroups() {
 
       {/* FAQ */}
       <section className="max-w-6xl mx-auto px-4 py-10 grid gap-8 md:grid-cols-2">
-  <div className="rounded-2xl overflow-hidden shadow-md">
-    <img
-      src="/images/faq-support.png"
-      alt="Person receiving support"
-      className="w-full h-full object-cover"
-    />
-  </div>
+        <div className="rounded-2xl overflow-hidden shadow-md">
+          <img
+            src="/images/faq-support.png"
+            alt="Person receiving support"
+            className="w-full h-full object-cover"
+          />
+        </div>
 
-  <div>
-    <SectionTitle title="Frequently Asked Questions" />
-    <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 divide-y divide-gray-100">
-      {faqs.map((f) => (
-        <FAQItem key={f.q} {...f} />
-      ))}
-    </div>
-  </div>
-</section>
-
+        <div>
+          <SectionTitle title="Frequently Asked Questions" />
+          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 divide-y divide-gray-100">
+            {faqs.map((f) => (
+              <FAQItem key={f.q} {...f} />
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* YOU MAY ALSO LIKE */}
       <section className="bg-[#ff8a00]">
         <div className="max-w-6xl mx-auto px-4 py-10">
-          <h3 className="text-white font-bold text-xl mb-4">You May Also Like</h3>
+          <h3 className="text-white font-bold text-xl mb-4">
+            You May Also Like
+          </h3>
           <div className="grid md:grid-cols-3 gap-4">
             {[
               {
@@ -363,17 +449,31 @@ export default function SupportGroups() {
                 className="rounded-2xl overflow-hidden bg-white/90 border border-white/50 hover:shadow-lg transition"
               >
                 <div className="aspect-[4/3] bg-gray-100">
-                  <img src={x.img} alt={x.title} className="w-full h-full object-cover" />
+                  <img
+                    src={x.img}
+                    alt={x.title}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div className="p-4">
                   <p className="font-semibold text-[#0b1c33]">{x.title}</p>
-                  <span className="mt-2 inline-block text-[#0e2340] font-semibold text-sm">Learn more →</span>
+                  <span className="mt-2 inline-block text-[#0e2340] font-semibold text-sm">
+                    Learn more →
+                  </span>
                 </div>
               </Link>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Booking modal */}
+      <CalBookingModal
+        open={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        name={loggedInUser?.fullName}
+        email={loggedInUser?.email}
+      />
     </div>
   );
 }
