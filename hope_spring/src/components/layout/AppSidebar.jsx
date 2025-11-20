@@ -1,34 +1,20 @@
+// AppSidebar.jsx
 import React from "react";
 import { NavLink } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  DollarSign,
-  CheckSquare,
-  Megaphone,
-  CalendarDays,
-  BarChart3,
-  MessageSquare,
-  Settings,
-  LogOut,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
-const AdminSidebar = ({ isOpen, setIsOpen }) => {
-  const navItems = [
-    { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-    { name: "Users", path: "/admin/users", icon: Users },
-    { name: "Programs", path: "/admin/add-programs", icon: Calendar },
-    { name: "Donations", path: "/admin/donations", icon: DollarSign },
-    { name: "Attendance", path: "/admin/attendance", icon: CheckSquare },
-    { name: "Announcements", path: "/admin/announcements", icon: Megaphone },
-    { name: "Event Calendar", path: "/admin/EventCalendar", icon: CalendarDays },
-    { name: "Analytics", path: "/admin/analytics", icon: BarChart3 },
-    { name: "Communication", path: "/admin/communication", icon: MessageSquare },
-    { name: "Settings", path: "/admin/settings", icon: Settings },
-  ];
-
-  const handleLogout = () => alert("Logout clicked!");
+const AppSidebar = ({
+  isOpen,
+  setIsOpen,
+  title = "HopeSpring",
+  subtitle,
+  navItems = [],
+  onLogout,
+}) => {
+  const handleLogoutClick = () => {
+    if (onLogout) onLogout();
+    else alert("Logout clicked!");
+  };
 
   return (
     <>
@@ -47,12 +33,14 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
         }`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
+          {/* Logo / Title */}
           <div className="p-6 border-b border-white/20 flex items-center gap-3">
-            {/* <img src={hopespringLogo} alt="HopeSpring" className="h-10 w-10" /> */}
+            {/* Add logo here if needed */}
             <div>
-              <h1 className="text-lg font-bold">HopeSpring</h1>
-              <p className="text-xs text-white/70">Admin Panel</p>
+              <h1 className="text-lg font-bold">{title}</h1>
+              {subtitle && (
+                <p className="text-xs text-white/70">{subtitle}</p>
+              )}
             </div>
           </div>
 
@@ -62,7 +50,7 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === "/admin"}
+                end={item.exact}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                     isActive
@@ -71,7 +59,7 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
                   }`
                 }
               >
-                <item.icon className="w-5 h-5" />
+                {item.icon && <item.icon className="w-5 h-5" />}
                 <span>{item.name}</span>
               </NavLink>
             ))}
@@ -80,7 +68,7 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
           {/* Logout */}
           <div className="p-4 border-t border-white/10">
             <button
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="flex items-center gap-3 px-4 py-3 w-full rounded-xl hover:bg-white/10 transition"
             >
               <LogOut className="w-5 h-5" />
@@ -93,4 +81,4 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
   );
 };
 
-export default AdminSidebar;
+export default AppSidebar;

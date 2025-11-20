@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { Megaphone, Plus, Edit, Trash2, Image as ImageIcon } from "lucide-react";
-import AdminLayout from "./NavSection/AdminLayout";
+import AdminLayout from "../AdminLayout";
 
 const API_BASE = "/api/announcements";
 

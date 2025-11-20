@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Search, Plus, Download, Users, UserCheck, UserX, Calendar } from "lucide-react";
-import AdminLayout from "./NavSection/AdminLayout";
+import AdminLayout from "../AdminLayout";
 
 const UsersPage = () => {
   const [search, setSearch] = useState("");
