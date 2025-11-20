@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import LanguageDropdown from "./LanguageDropdown";
+import LanguageDropdown from "../shared/LanguageDropdown";
 import axios from "axios";
 import { Bell } from "lucide-react";
 
