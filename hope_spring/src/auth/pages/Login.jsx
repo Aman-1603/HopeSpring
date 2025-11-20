@@ -22,6 +22,7 @@ const Login = () => {
 
     try {
       setBusy(true);
+
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -31,14 +32,43 @@ const Login = () => {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "Login failed.");
+      // ---- SAFE PARSING: handle proxy / non-JSON responses ----
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        // Not JSON → likely proxy / server error text
+        throw new Error(text || "Unexpected server error");
+      }
 
-      localStorage.setItem("token", data.token);
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Login failed.");
+      }
+
+      // ---- STORE TOKEN (existing behaviour) ----
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        // optional duplicate explicit key
+        localStorage.setItem("hsToken", data.token);
+      }
+
+      // ---- STORE USER FOR SUPPORT GROUP PAGE ----
+      if (data.user) {
+        const userForClient = {
+          id: data.user.id,
+          fullName: data.user.name,   // name column from DB
+          email: data.user.email,
+          role: data.user.role,
+        };
+        localStorage.setItem("hsUser", JSON.stringify(userForClient));
+      }
+
       alert("✅ Login successful!");
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message);
+      console.error("Login error:", err);
+      setError(err.message || "Login failed.");
     } finally {
       setBusy(false);
     }
