@@ -1,7 +1,7 @@
 // AddProgram.js - UPDATED API_BASE
 import { useEffect, useState } from "react";
 import axios from "axios";
-import AdminLayout from "./NavSection/AdminLayout";
+import AdminLayout from "../AdminLayout";
 import { CalendarDays, MapPin, Users, User, PlusCircle, Tag } from "lucide-react";
 
 // ----------------------------------------------------

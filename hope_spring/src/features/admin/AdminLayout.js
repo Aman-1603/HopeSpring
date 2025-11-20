@@ -1,7 +1,8 @@
 // AdminLayout.js
 import React, { useState } from "react";
 import AdminNavbar from "./AdminNavbar";
-import AppSidebar from "./../../components/shared/AppSidebar"; // adjust path
+import AppSidebar from "../../components/layout/AppSidebar";
+
 import {
   LayoutDashboard,
   Users,

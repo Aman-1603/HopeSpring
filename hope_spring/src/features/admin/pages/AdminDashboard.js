@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import AdminLayout from "./NavSection/AdminLayout"; // <-- wrap dashboard inside layout
+import AdminLayout from "../AdminLayout"; // <-- wrap dashboard inside layout
 
 // Mock data
 const donationData = [
