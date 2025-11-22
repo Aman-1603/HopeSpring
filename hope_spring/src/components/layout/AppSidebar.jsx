@@ -28,7 +28,8 @@ const AppSidebar = ({
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-gradient-to-b from-[#7c6cf2] to-[#9b87f5] text-white border-r border-white/10 transform transition-transform duration-300 ${
+        className={`fixed lg:sticky top-0 left-0 z-30 lg:z-10 h-screen w-64 bg-gradient-to-b from-[#7c6cf2] to-[#9b87f5] text-white border-r border-white/10 transform transition-transform duration-300 ${
+
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
@@ -67,13 +68,14 @@ const AppSidebar = ({
 
           {/* Logout */}
           <div className="p-4 border-t border-white/10">
-            <button
+            {onLogout && (<button
               onClick={handleLogoutClick}
+              hidden={!onLogout}
               className="flex items-center gap-3 px-4 py-3 w-full rounded-xl hover:bg-white/10 transition"
             >
               <LogOut className="w-5 h-5" />
               <span>Logout</span>
-            </button>
+            </button>)}
           </div>
         </div>
       </aside>
