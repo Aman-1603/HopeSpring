@@ -6,9 +6,11 @@ import Recommendations from '../components/Recommendations';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import UserLayout from '../UserLayout';
+import { useAuth } from '../../../contexts/AuthContext'
 
 const UserDashboard = () => {
   const navigate = useNavigate();
+  const {logout} = useAuth();
 
   // Mock user
   const user = { name: 'Guest User' };
@@ -103,7 +105,8 @@ const UserDashboard = () => {
   };
 
   const handleLogout = () => {
-    toast.info('Logout functionality disabled in demo view.');
+    logout();
+    navigate("/");
   };
 
   const handleAddRecommendation = (recommendation) => {

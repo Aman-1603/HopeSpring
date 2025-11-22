@@ -67,13 +67,14 @@ const AppSidebar = ({
 
           {/* Logout */}
           <div className="p-4 border-t border-white/10">
-            <button
+            {onLogout && (<button
               onClick={handleLogoutClick}
+              hidden={!onLogout}
               className="flex items-center gap-3 px-4 py-3 w-full rounded-xl hover:bg-white/10 transition"
             >
               <LogOut className="w-5 h-5" />
               <span>Logout</span>
-            </button>
+            </button>)}
           </div>
         </div>
       </aside>
