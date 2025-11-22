@@ -1,9 +1,8 @@
 // AddProgram.js - FULL UPDATED FILE (support_group + occurrences + Cal integration)
 import { useEffect, useState } from "react";
 import axios from "axios";
-import AdminLayout from "./NavSection/AdminLayout";
-import { CalendarDays, MapPin, Users, User, PlusCircle, Tag } from "lucide-react";
-
+import AdminLayout from "../AdminLayout";
+import { CalendarDays, MapPin, Users, User, PlusCircle, Tag, Link2, CheckCircle2, Loader2 } from "lucide-react";
 // Use relative path for proxy
 const API_BASE = "/api/programs";
 const CAL_BASE = "/api/cal";
