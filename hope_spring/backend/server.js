@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import { pool } from "./db.js";
 import programRoutes from "./routes/programRoutes.js";
 import announcementRoutes from "./routes/announcements.js";
+import calRoutes from "./routes/calRoutes.js";
 
 dotenv.config();
 
@@ -269,10 +270,12 @@ app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
 });
 
 /* ------------------------------------------
-   Program + Announcement Routes
+   Program + Announcement + cal Routes
 -------------------------------------------*/
 app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
+app.use("/api/cal", calRoutes);
+
 
 /* ------------------------------------------
    Start Server
