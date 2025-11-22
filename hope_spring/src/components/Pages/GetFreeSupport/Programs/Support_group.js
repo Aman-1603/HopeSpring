@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/components/Pages/GetFreeSupport/Programs/Support_group.js
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 /** Small atoms */
@@ -29,40 +30,62 @@ const ProgramCard = ({
   day,
   time,
   facilitator,
-  href = "/support/calendar",
+  linked,
+  onRegister,
 }) => (
   <article className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5 shadow-sm hover:shadow-md transition">
     <div className="flex flex-wrap items-center gap-2 mb-2">
       {day && <Badge>{day}</Badge>}
       {time && <Badge>{time}</Badge>}
     </div>
+
     <h3 className="font-semibold text-lg text-[#0b1c33]">{title}</h3>
+
     {facilitator && (
       <p className="text-sm text-gray-500 mb-2">with {facilitator}</p>
     )}
-    <p className="text-gray-700 text-[15px] leading-relaxed">{summary}</p>
-    <Link
-      to={href}
-      className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
-    >
-      Register here
-    </Link>
+
+    <p className="text-gray-700 text-[15px] leading-relaxed">
+      {summary?.split("||")[0]}
+      {summary?.includes("||") && (
+        <span className="block font-semibold mt-1">
+          {summary.split("||")[1]}
+        </span>
+      )}
+    </p>
+
+    {!linked ? (
+      <button
+        type="button"
+        disabled
+        className="mt-4 inline-block rounded-lg bg-gray-200 text-gray-600 px-4 py-2 text-sm font-semibold cursor-not-allowed"
+      >
+        Not yet open
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={onRegister}
+        className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
+      >
+        Register here
+      </button>
+    )}
   </article>
 );
 
-const FacilitatorCard = ({
-  name,
-  img = "/images/facilitators/placeholder.jpg",
-}) => (
-  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
-    <div className="aspect-[1/1] w-full bg-gray-100">
-      <img src={img} alt={name} className="w-full h-full object-cover" />
+const FacilitatorCard = ({ name, img = "/images/facilitators/placeholder.jpg" }) => {
+  return (
+    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+      <div className="aspect-[1/1] w-full bg-gray-100">
+        <img src={img} alt={name} className="w-full h-full object-cover" />
+      </div>
+      <div className="p-3 text-center">
+        <p className="font-semibold text-[#0b1c33]">{name}</p>
+      </div>
     </div>
-    <div className="p-3 text-center">
-      <p className="font-semibold text-[#0b1c33]">{name}</p>
-    </div>
-  </div>
-);
+  );
+};
 
 const FAQItem = ({ q, a }) => {
   const [open, setOpen] = useState(false);
@@ -93,16 +116,16 @@ const FAQItem = ({ q, a }) => {
   );
 };
 
-/** Cal booking modal – full/near-full screen */
-const CalBookingModal = ({ open, onClose, name, email }) => {
-  if (!open) return null;
+/** Cal booking modal */
+const CalBookingModal = ({ open, onClose, calUser, calSlug, name, email }) => {
+  if (!open || !calUser || !calSlug) return null;
 
   const params = new URLSearchParams();
   params.set("embed", "1");
   if (name) params.set("name", name);
   if (email) params.set("email", email);
 
-  const src = `https://cal.com/kamutest/newtestevent?${params.toString()}`;
+  const src = `https://cal.com/${calUser}/${calSlug}?${params.toString()}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
@@ -134,7 +157,6 @@ const CalBookingModal = ({ open, onClose, name, email }) => {
   );
 };
 
-/** Page */
 export default function SupportGroups() {
   const benefits = [
     {
@@ -151,68 +173,6 @@ export default function SupportGroups() {
       title: "Spark a connection",
       text:
         "Whether in-person or remote, our groups help form bonds that carry beyond the session. We celebrate wins and provide a safe and welcoming place whenever you need to connect.",
-    },
-  ];
-
-  const programsLeft = [
-    {
-      title: "Women’s Morning Support Group with Tammy",
-      facilitator: "Tammy",
-      day: "Weekly",
-      time: "Morning",
-      summary:
-        "A supportive space for women affected by cancer to connect, share, and uplift one another. Includes check-ins, topic circles, and resources for resilience.",
-    },
-    {
-      title: "Men’s support group",
-      facilitator: "Peer-led",
-      day: "Bi-weekly",
-      time: "Evening",
-      summary:
-        "A confidential space for men navigating diagnosis, treatment, survivorship, and life changes. Build community, learn coping skills, and support each other.",
-    },
-    {
-      title: "Caregiver support group with Suzy",
-      facilitator: "Suzy",
-      day: "Weekly",
-      time: "Evening",
-      summary:
-        "Caregiving brings unique stress. This group focuses on practical strategies, emotional health, boundary-setting, and connecting with others in similar roles.",
-    },
-  ];
-
-  const programsRight = [
-    {
-      title: "Women’s Evening Support Group with Christine",
-      facilitator: "Christine",
-      day: "Weekly",
-      time: "Evening",
-      summary:
-        "A relaxed evening space to reflect, share stories, and strengthen coping strategies. Open to women at any point in the cancer journey.",
-    },
-    {
-      title: "Pancreatic support group with Barbara",
-      facilitator: "Barbara",
-      day: "Monthly",
-      time: "Evening",
-      summary:
-        "A diagnosis-specific circle for people impacted by pancreatic cancer. Discuss treatment, side-effects, nutrition, and navigating next steps.",
-    },
-    {
-      title: "Ovarian support group with Barbara",
-      facilitator: "Barbara",
-      day: "Monthly",
-      time: "Evening",
-      summary:
-        "A diagnosis-specific circle for people impacted by ovarian cancer. Share experiences, explore resources, and feel supported.",
-    },
-    {
-      title: "Prostate Cancer Support Group Waterloo-Wellington",
-      facilitator: "Community partners",
-      day: "Monthly",
-      time: "Evening",
-      summary:
-        "For individuals impacted by prostate cancer and their families. Evidence-informed discussion, guest speakers, and practical peer support.",
     },
   ];
 
@@ -241,20 +201,61 @@ export default function SupportGroups() {
     },
   ];
 
-  // 🔹 Pull logged-in user from localStorage so Cal can prefill
   const [loggedInUser, setLoggedInUser] = useState(null);
+
+  const [programs, setPrograms] = useState([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const [programsError, setProgramsError] = useState(null);
+
+  // modal state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState(null);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem("hsUser");
       if (!raw) return;
-      const user = JSON.parse(raw);
-      setLoggedInUser(user);
+      setLoggedInUser(JSON.parse(raw));
     } catch (e) {
       console.error("Failed to parse hsUser from localStorage", e);
     }
   }, []);
+
+  const fetchSupportGroups = async () => {
+    try {
+      setLoadingPrograms(true);
+      const res = await fetch("/api/programs/support-groups");
+      if (!res.ok) throw new Error("Failed to fetch support groups");
+      const data = await res.json();
+      setPrograms(data);
+      setProgramsError(null);
+    } catch (e) {
+      console.error(e);
+      setProgramsError("Unable to load support group programs right now.");
+    } finally {
+      setLoadingPrograms(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSupportGroups();
+  }, []);
+
+  const leftPrograms = useMemo(
+    () => programs.filter((p) => p.column_index === 1),
+    [programs]
+  );
+  const rightPrograms = useMemo(
+    () => programs.filter((p) => p.column_index === 2),
+    [programs]
+  );
+
+  const openBookingFor = (p) => {
+    const linked = !!(p?.cal_user && p?.cal_slug);
+    if (!linked) return;
+    setSelectedProgram(p);
+    setIsBookingOpen(true);
+  };
 
   return (
     <div className="pb-1">
@@ -279,13 +280,6 @@ export default function SupportGroups() {
               and caregivers. Connect with others, share experiences, and build
               resilience — at any stage of the cancer journey.
             </p>
-            <button
-              type="button"
-              onClick={() => setIsBookingOpen(true)}
-              className="mt-5 inline-block rounded-lg bg-emerald-500 text-white font-semibold px-5 py-2.5 hover:bg-emerald-600"
-            >
-              Book a group
-            </button>
           </div>
         </div>
       </section>
@@ -302,8 +296,7 @@ export default function SupportGroups() {
           <div className="text-gray-700 leading-relaxed">
             Each of our support groups is facilitated by trained professionals,
             focusing on connection, education, and practical tools for
-            navigating the cancer experience. Whether you’re newly diagnosed, in
-            treatment, or supporting someone you love, you are welcome here.
+            navigating the cancer experience.
           </div>
         </div>
       </section>
@@ -341,7 +334,7 @@ export default function SupportGroups() {
       <section className="max-w-6xl mx-auto px-4 py-10">
         <SectionTitle
           title="Meet your facilitators"
-          desc="Get to know the experienced experts behind our programs. With compassionate care, they build a safe, welcoming space for healing, connection, and growth."
+          desc="Get to know the experienced experts behind our programs."
         />
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-6">
           {facilitators.map((f) => (
@@ -350,23 +343,70 @@ export default function SupportGroups() {
         </div>
       </section>
 
-      {/* PROGRAM CARDS */}
+      {/* PROGRAM CARDS (DYNAMIC) */}
       <section className="max-w-6xl mx-auto px-4 py-10">
         <SectionTitle
           title="Support Groups Programs For The Cancer Community"
           desc=""
         />
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
-          <div className="space-y-4">
-            {programsLeft.map((p) => (
-              <ProgramCard key={p.title} {...p} />
-            ))}
+
+        {loadingPrograms && (
+          <p className="mt-4 text-gray-500 text-sm">Loading programs…</p>
+        )}
+
+        {programsError && (
+          <p className="mt-4 text-red-600 text-sm">{programsError}</p>
+        )}
+
+        {!loadingPrograms && !programsError && (
+          <div className="grid md:grid-cols-2 gap-6 mt-6">
+            <div className="space-y-4">
+              {leftPrograms.map((p) => {
+                const linked = !!(p.cal_user && p.cal_slug);
+                return (
+                  <ProgramCard
+                    key={p.id}
+                    title={p.title}
+                    facilitator={p.instructor}
+                    day={p.day_label}
+                    time={p.time_label}
+                    summary={p.description}
+                    linked={linked}
+                    onRegister={() => openBookingFor(p)}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="space-y-4">
+              {rightPrograms.map((p) => {
+                const linked = !!(p.cal_user && p.cal_slug);
+                return (
+                  <ProgramCard
+                    key={p.id}
+                    title={p.title}
+                    facilitator={p.instructor}
+                    day={p.day_label}
+                    time={p.time_label}
+                    summary={p.description}
+                    linked={linked}
+                    onRegister={() => openBookingFor(p)}
+                  />
+                );
+              })}
+            </div>
           </div>
-          <div className="space-y-4">
-            {programsRight.map((p) => (
-              <ProgramCard key={p.title} {...p} />
-            ))}
-          </div>
+        )}
+
+        {/* Optional manual refresh button for sanity */}
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={fetchSupportGroups}
+            className="text-xs px-3 py-2 border rounded-xl bg-gray-50 hover:bg-gray-100"
+          >
+            Refresh programs
+          </button>
         </div>
       </section>
 
@@ -385,10 +425,7 @@ export default function SupportGroups() {
           <h3 className="text-2xl font-bold text-[#0b1c33]">What to expect</h3>
           <p className="text-gray-700 mt-2 leading-relaxed">
             Expect a supportive and compassionate environment where you can
-            share at your own pace. Our group guidelines help create an
-            atmosphere of respect and confidentiality. Sessions often include
-            check-ins, topic discussions, gentle practices, and resource
-            sharing.
+            share at your own pace.
           </p>
           <Link
             to="/support/calendar"
@@ -471,6 +508,8 @@ export default function SupportGroups() {
       <CalBookingModal
         open={isBookingOpen}
         onClose={() => setIsBookingOpen(false)}
+        calUser={selectedProgram?.cal_user}
+        calSlug={selectedProgram?.cal_slug}
         name={loggedInUser?.fullName}
         email={loggedInUser?.email}
       />
