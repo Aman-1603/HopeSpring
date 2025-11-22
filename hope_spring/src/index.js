@@ -6,6 +6,7 @@ import App from "./app/App";
 import reportWebVitals from "./reportWebVitals";
 import "./i18n";
 import i18n from "i18next";
+import {AuthProvider} from "./contexts/AuthContext";
 
 i18n.on("languageChanged", (lng) => {
   if (typeof document !== "undefined") {
@@ -17,7 +18,9 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <BrowserRouter>
     <React.StrictMode>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </React.StrictMode>
   </BrowserRouter>
 );

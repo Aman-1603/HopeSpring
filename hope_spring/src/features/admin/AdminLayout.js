@@ -2,7 +2,8 @@
 import React, { useState } from "react";
 import AdminNavbar from "./AdminNavbar";
 import AppSidebar from "../../components/layout/AppSidebar";
-
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -32,9 +33,11 @@ const adminNavItems = [
 const AdminLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
-    // TODO: hook into your auth context logout
-    alert("Admin logout clicked!");
+  const {logout} = useAuth();
+  const navigate = useNavigate();
+  const HandleLogout = () => {
+    logout();
+    navigate("/");
   };
 
   return (
@@ -45,7 +48,7 @@ const AdminLayout = ({ children }) => {
         title="HopeSpring"
         subtitle="Admin Panel"
         navItems={adminNavItems}
-        onLogout={handleLogout}
+        onLogout={HandleLogout}
       />
       <div className="flex-1 flex flex-col">
         <AdminNavbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />

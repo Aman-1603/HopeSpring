@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Newsletter from "../components/shared/Newsletter";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 
 // Public Pages
 import Home from "../components/Pages/Home";
@@ -69,7 +70,8 @@ export default function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/bookprogram" element={<Book_Program />} />
           <Route path="/programs" element={<Programs />} />
@@ -117,15 +119,17 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
 
           {/* ===== ADMIN ROUTES ===== */}
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/users" element={<UsersPage />} />
-          <Route path="/admin/add-programs" element={<ProgramManagement />} />
-          <Route path="/admin/activeprogram" element={<ActiveProgramsPage />} />
-          <Route path="/admin/EventCalendar" element={<AdminEventCalendar />} />
-          <Route path="/admin/settings" element={<AdminSettings/>}/>
-          <Route path="/admin/announcements" element={<Announcements/>}/>         
+          
+          <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute role="admin"><UsersPage /></ProtectedRoute>} />
+          <Route path="/admin/add-programs" element={<ProtectedRoute role="admin"><ProgramManagement /></ProtectedRoute>} />
+          <Route path="/admin/activeprogram" element={<ProtectedRoute role="admin"><ActiveProgramsPage /></ProtectedRoute>} />
+          <Route path="/admin/EventCalendar" element={<ProtectedRoute role="admin"><AdminEventCalendar /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminSettings/></ProtectedRoute>} />
+          <Route path="/admin/announcements" element={<ProtectedRoute role="admin"><Announcements/></ProtectedRoute>} />         
                 {/* ===== User ROUTES ===== */}
-          <Route path="/user/dashboard" element={<UserDashboard />} />
+                
+          <Route path="/user/dashboard" element={<ProtectedRoute role="member"><UserDashboard /></ProtectedRoute>} />
 
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
