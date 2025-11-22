@@ -15,14 +15,14 @@ const UserLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen">
       <AppSidebar
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         title="HopeSpring"
         subtitle="Member Area"
         navItems={userNavItems}
-        
+
       />
       <div className="flex-1 flex flex-col">
 

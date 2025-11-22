@@ -28,7 +28,8 @@ const AppSidebar = ({
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-gradient-to-b from-[#7c6cf2] to-[#9b87f5] text-white border-r border-white/10 transform transition-transform duration-300 ${
+        className={`fixed lg:sticky top-0 left-0 z-30 lg:z-10 h-screen w-64 bg-gradient-to-b from-[#7c6cf2] to-[#9b87f5] text-white border-r border-white/10 transform transition-transform duration-300 ${
+
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
