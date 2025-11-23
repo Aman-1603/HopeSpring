@@ -8,6 +8,8 @@ import { pool } from "./db.js";
 import programRoutes from "./routes/programRoutes.js";
 import announcementRoutes from "./routes/announcements.js";
 import calRoutes from "./routes/calRoutes.js";
+import userRoutes from "../backend/routes/userRoutes.js";
+
 
 dotenv.config();
 
@@ -78,6 +80,10 @@ app.post("/api/register", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+// user section admin
+
+app.use("/api/users", userRoutes);
 
 // LOGIN
 app.post("/api/login", async (req, res) => {
