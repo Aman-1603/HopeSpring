@@ -9,7 +9,7 @@ import programRoutes from "./routes/programRoutes.js";
 import announcementRoutes from "./routes/announcements.js";
 import calRoutes from "./routes/calRoutes.js";
 import userRoutes from "../backend/routes/userRoutes.js";
-
+import calendarEventRoutes from "../backend/routes/calendarEvents.js";
 
 dotenv.config();
 
@@ -84,6 +84,11 @@ app.post("/api/register", async (req, res) => {
 // user section admin
 
 app.use("/api/users", userRoutes);
+
+// for calendar-event section
+
+app.use("/api/calendar-events", calendarEventRoutes);
+
 
 // LOGIN
 app.post("/api/login", async (req, res) => {
