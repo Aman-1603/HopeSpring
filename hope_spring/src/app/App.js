@@ -49,9 +49,17 @@ import UsersPage from "../features/admin/pages/UsersPage";
 import ProgramManagement from "../features/admin/pages/AddProgram";
 import ActiveProgramsPage from "../features/admin/pages/ActiveProgramsPage";
 import AdminEventCalendar from "../features/admin/pages/AdminEventCalendar";
-import UserDashboard from "../features/user/pages/UserDashboard";
+
 import AdminSettings from "../features/admin/pages/AdminSettings";
 import Announcements from "../features/admin/pages/Announcements";
+
+//User Section
+import UserDashboard from "../features/user/pages/UserDashboard";
+import Profile from "../features/user/pages/Profile";
+import MyOrders from "../features/user/pages/MyOrders";
+import PastSessions from "../features/user/pages/PastSessions";
+
+
 
 
 export default function App() {
@@ -130,7 +138,9 @@ export default function App() {
                 {/* ===== User ROUTES ===== */}
                 
           <Route path="/user/dashboard" element={<ProtectedRoute role="member"><UserDashboard /></ProtectedRoute>} />
-
+          <Route path="/user/profile" element={<ProtectedRoute role="member"><Profile /></ProtectedRoute>} />
+          <Route path="/user/past-sessions" element={<ProtectedRoute role="member"><PastSessions /></ProtectedRoute>} />
+          <Route path="/user/orders" element={<ProtectedRoute role="member"><MyOrders /></ProtectedRoute>} />
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
         </Routes>
