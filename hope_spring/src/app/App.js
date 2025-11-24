@@ -52,6 +52,7 @@ import AdminEventCalendar from "../features/admin/pages/AdminEventCalendar";
 
 import AdminSettings from "../features/admin/pages/AdminSettings";
 import Announcements from "../features/admin/pages/Announcements";
+import DonateSuccess from "../components/Pages/DonateSuccess";
 
 //User Section
 import UserDashboard from "../features/user/pages/UserDashboard";
@@ -141,6 +142,10 @@ export default function App() {
           <Route path="/user/profile" element={<ProtectedRoute role="member"><Profile /></ProtectedRoute>} />
           <Route path="/user/past-sessions" element={<ProtectedRoute role="member"><PastSessions /></ProtectedRoute>} />
           <Route path="/user/orders" element={<ProtectedRoute role="member"><MyOrders /></ProtectedRoute>} />
+
+          {/* For payment sucess page */}
+          <Route path="/donate/success" element={<DonateSuccess />} />
+
           {/* 404 */}
           <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
         </Routes>

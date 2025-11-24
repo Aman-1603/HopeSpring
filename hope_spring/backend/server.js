@@ -10,6 +10,7 @@ import announcementRoutes from "./routes/announcements.js";
 import calRoutes from "./routes/calRoutes.js";
 import userRoutes from "../backend/routes/userRoutes.js";
 import calendarEventRoutes from "../backend/routes/calendarEvents.js";
+import donateRoutes from "../backend/routes/donateRoutes.js";
 
 dotenv.config();
 
@@ -88,6 +89,11 @@ app.use("/api/users", userRoutes);
 // for calendar-event section
 
 app.use("/api/calendar-events", calendarEventRoutes);
+
+// for strip payment for the donation section
+
+app.use("/api/donate", donateRoutes);
+
 
 
 // LOGIN

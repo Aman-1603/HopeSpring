@@ -337,19 +337,26 @@ const AdminEventCalendar = () => {
         {/* calendar */}
         <div className="bg-white rounded-3xl shadow-xl border border-[#e2e8f0] px-4 sm:px-6 py-4">
           <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: 620 }}
-            components={{
-              toolbar: CustomToolbar,
-              event: CustomEvent,
-            }}
-            eventPropGetter={eventStyleGetter}
-            popup
-            onSelectEvent={handleSelectEvent}
-          />
+  localizer={localizer}
+  events={events}
+  startAccessor="start"
+  endAccessor="end"
+  style={{ height: 620 }}
+
+  views={["month", "week", "day"]}
+  defaultView="month"
+  onNavigate={() => {}}     // 🔥 REQUIRED
+  onView={() => {}}         // 🔥 REQUIRED
+
+  components={{
+    toolbar: CustomToolbar,
+    event: CustomEvent,
+  }}
+  eventPropGetter={eventStyleGetter}
+  popup
+  onSelectEvent={handleSelectEvent}
+/>
+
         </div>
 
         {/* detail modal */}
