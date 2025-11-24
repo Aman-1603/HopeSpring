@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import UserLayout from '../UserLayout';
 import { useAuth } from '../../../contexts/AuthContext'
 
-const UserDashboard = () => {
+const UserDashboard = () => {                                                
   const navigate = useNavigate();
   const {logout} = useAuth();
 
