@@ -2,74 +2,141 @@
 import axios from "axios";
 
 const CAL_BASE = "https://api.cal.com/v2";
+//const CAL_VERSION = "2024-06-14";
+const CAL_VERSION = "2024-09-04";
 
-function requireEnv(name) {
-  if (!process.env[name]) throw new Error(`Missing env var: ${name}`);
-  return process.env[name];
+
+/* ============================================
+   Load API key lazily (dotenv loads before use)
+============================================ */
+function getApiKey() {
+  const key = process.env.CAL_API_KEY;
+  if (!key) throw new Error("Missing env var: CAL_API_KEY");
+  return key.trim();
 }
 
-export const cal = axios.create({
-  baseURL: CAL_BASE,
-  headers: {
-    Authorization: `Bearer ${requireEnv("CAL_API_KEY")}`,
-    "Content-Type": "application/json",
-    "cal-api-version": "2024-06-14",
-  },
-  timeout: 15000,
-});
+function makeCal() {
+  const key = getApiKey();
+  const authHeader = key.startsWith("Bearer ") ? key : `Bearer ${key}`;
+
+  return axios.create({
+    baseURL: CAL_BASE,
+    headers: {
+      Authorization: authHeader,
+      "Content-Type": "application/json",
+      "cal-api-version": CAL_VERSION,
+    },
+    timeout: 20000,
+  });
+}
+
+/* ============================================
+   RAW CLIENT PROXY (lazy)
+============================================ */
+export const cal = {
+  get: (path, config) => makeCal().get(path, config),
+  post: (path, data, config) => makeCal().post(path, data, config),
+  patch: (path, data, config) => makeCal().patch(path, data, config),
+  delete: (path, config) => makeCal().delete(path, config),
+};
 
 function unwrap(res) {
-  return res?.data?.data || res?.data || null;
+  return res?.data?.data ?? res?.data ?? null;
 }
 
-/**
- * Create a Cal Schedule with date overrides only.
- * NOTE: Cal schedule payload shape may evolve; this matches current docs:
- * - schedules support availability + date overrides. :contentReference[oaicite:1]{index=1}
- */
-export async function createSchedule({
-  name,
-  timeZone = "America/New_York",
-  availability = [],  // weekly rules (empty means no default availability)
-  overrides = [],     // per-date availability blocks
-}) {
-  if (!name) throw new Error("createSchedule requires name");
+function toApiMsg(err) {
+  const d = err?.response?.data;
+  if (!d) return err.message || "Unknown Cal error";
+  if (typeof d === "string") return d;
+  if (d.message)
+    return typeof d.message === "string"
+      ? d.message
+      : JSON.stringify(d.message);
+  if (d.error?.message) return d.error.message;
+  return JSON.stringify(d);
+}
 
-  const payload = {
-    name,
-    timeZone,
-    availability,
-    overrides,
-  };
-
+async function calGet(path) {
   try {
-    const res = await cal.post("/schedules", payload);
-    return unwrap(res);
+    return unwrap(await makeCal().get(path));
   } catch (err) {
-    const apiMsg =
-      err?.response?.data?.message ||
-      err?.response?.data?.error ||
-      JSON.stringify(err?.response?.data || {});
-    throw new Error(`Cal createSchedule failed: ${apiMsg}`);
+    const msg = toApiMsg(err);
+    console.error("❌ Cal GET failed:", path, msg);
+    throw new Error(msg);
   }
 }
 
-/**
- * Create a Cal Event Type for a program
- */
+async function calPost(path, payload) {
+  try {
+    return unwrap(await makeCal().post(path, payload));
+  } catch (err) {
+    const msg = toApiMsg(err);
+    console.error("❌ Cal POST failed:", path, msg, payload);
+    throw new Error(msg);
+  }
+}
+
+async function calPatch(path, payload) {
+  try {
+    return unwrap(await makeCal().patch(path, payload));
+  } catch (err) {
+    const msg = toApiMsg(err);
+    console.error("❌ Cal PATCH failed:", path, msg, payload);
+    throw new Error(msg);
+  }
+}
+
+/* ============================================
+   SCHEDULES
+============================================ */
+export async function createSchedule({
+  name,
+  timeZone = "America/New_York",
+  availability = [],
+  overrides = [],
+  isDefault = false,
+}) {
+  const payload = { name, timeZone, availability, overrides, isDefault };
+  return calPost("/schedules", payload);
+}
+
+export async function updateSchedule(scheduleId, patch = {}) {
+  if (!scheduleId) throw new Error("updateSchedule: scheduleId required");
+
+  const payload = {};
+
+  if (patch.name !== undefined) payload.name = patch.name;
+  if (patch.timeZone !== undefined) payload.timeZone = patch.timeZone;
+
+  // allow empty array to be sent (important when resetting)
+  if (patch.availability !== undefined && Array.isArray(patch.availability)) {
+    payload.availability = patch.availability;
+  }
+
+  if (patch.overrides !== undefined && Array.isArray(patch.overrides)) {
+    payload.overrides = patch.overrides;
+  }
+
+  if (patch.isDefault !== undefined && typeof patch.isDefault === "boolean") {
+    payload.isDefault = patch.isDefault;
+  }
+
+  return calPatch(`/schedules/${scheduleId}`, payload);
+}
+
+/* ============================================
+   EVENT TYPES
+============================================ */
 export async function createEventType({
   title,
   slug,
   description = "",
   lengthInMinutes = 60,
-  host,          // Cal username
+  host,
   metadata = {},
-  scheduleId,    // link to schedule so slots appear only on overrides
+  scheduleId,
+  bookingWindow, // optional
 }) {
-  if (!title || !slug) {
-    throw new Error("createEventType requires title and slug");
-  }
-
   const payload = {
     title,
     slug,
@@ -78,28 +145,44 @@ export async function createEventType({
     metadata,
   };
 
-  if (host) payload.hosts = [{ username: host }];
-  if (scheduleId) payload.scheduleId = scheduleId;
+  if (host !== undefined) payload.host = host;
+  if (scheduleId !== undefined) payload.scheduleId = scheduleId;
 
-  try {
-    const res = await cal.post("/event-types", payload);
-    return unwrap(res);
-  } catch (err) {
-    const apiMsg =
-      err?.response?.data?.message ||
-      err?.response?.data?.error ||
-      JSON.stringify(err?.response?.data || {});
+  // allow disabled/range/null if you ever pass it
+  if (bookingWindow !== undefined) payload.bookingWindow = bookingWindow;
 
-    if (
-      err?.response?.status === 409 ||
-      /slug/i.test(apiMsg) ||
-      /already exists/i.test(apiMsg)
-    ) {
-      throw new Error(
-        `Cal slug conflict for "${slug}". Change slug or delete existing event type. Details: ${apiMsg}`
-      );
-    }
+  return calPost("/event-types", payload);
+}
 
-    throw new Error(`Cal createEventType failed: ${apiMsg}`);
-  }
+export async function updateEventType(eventTypeId, patch = {}) {
+  if (!eventTypeId) throw new Error("updateEventType: eventTypeId required");
+
+  const payload = {};
+
+  if (patch.title !== undefined) payload.title = patch.title;
+  if (patch.slug !== undefined) payload.slug = patch.slug;
+  if (patch.description !== undefined) payload.description = patch.description;
+  if (patch.lengthInMinutes !== undefined)
+    payload.lengthInMinutes = patch.lengthInMinutes;
+  if (patch.host !== undefined) payload.host = patch.host;
+  if (patch.scheduleId !== undefined) payload.scheduleId = patch.scheduleId;
+  if (patch.metadata !== undefined) payload.metadata = patch.metadata;
+
+  // ✅ THIS IS THE CRITICAL FIX
+  // allow null or {disabled:true} to be sent
+  if (patch.bookingWindow !== undefined)
+    payload.bookingWindow = patch.bookingWindow;
+
+  return calPatch(`/event-types/${eventTypeId}`, payload);
+}
+
+/* ============================================
+   DEBUG HELPERS
+============================================ */
+export async function getSchedule(scheduleId) {
+  return calGet(`/schedules/${scheduleId}`);
+}
+
+export async function getEventType(eventTypeId) {
+  return calGet(`/event-types/${eventTypeId}`);
 }

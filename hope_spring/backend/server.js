@@ -5,12 +5,18 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { pool } from "./db.js";
+
 import programRoutes from "./routes/programRoutes.js";
 import announcementRoutes from "./routes/announcements.js";
+<<<<<<< HEAD
 import calRoutes from "./routes/calRoutes.js";
 import userRoutes from "../backend/routes/userRoutes.js";
 import calendarEventRoutes from "../backend/routes/calendarEvents.js";
 import donateRoutes from "../backend/routes/donateRoutes.js";
+=======
+import calRoutes from "./routes/calRoutes.js"; 
+import bookingRoutes from "./routes/bookingRoutes.js";
+>>>>>>> fc15545 (Program Creation from Admin, Going to DB, Booking from FrontEnd)
 
 dotenv.config();
 
@@ -21,7 +27,7 @@ const app = express();
 -------------------------------------------*/
 app.use(
   cors({
-    origin: "*", // you can tighten this later
+    origin: "*", // tighten later
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -144,82 +150,6 @@ app.post("/api/login", async (req, res) => {
 });
 
 /* ------------------------------------------
-   Cal.com Webhook → Bookings
--------------------------------------------*/
-
-app.post("/api/cal/webhook", async (req, res) => {
-  try {
-    console.log("🔥 Incoming Cal webhook");
-    console.log("Headers:", JSON.stringify(req.headers, null, 2));
-    console.log("Body:", JSON.stringify(req.body, null, 2));
-
-    const payload = req.body;
-
-    const trigger =
-      payload.triggerEvent ||
-      payload.trigger ||
-      payload.type ||
-      "UNKNOWN_TRIGGER";
-
-    const event =
-      payload.data ||
-      payload.payload ||
-      payload.event ||
-      payload.booking ||
-      payload;
-
-    console.log("Trigger:", trigger);
-
-    const calBookingId = event.id || event.uid || event.bookingId || null;
-
-    const attendee = (event.attendees && event.attendees[0]) || {};
-    const attendeeName = attendee.name || event.name || "Unknown";
-    const attendeeEmail = attendee.email || event.email || "unknown@example.com";
-
-    const eventStart = event.startTime || event.start || null;
-    const eventEnd = event.endTime || event.end || null;
-
-    console.log("calBookingId:", calBookingId);
-    console.log("attendee:", attendeeName, attendeeEmail);
-    console.log("eventStart:", eventStart, "eventEnd:", eventEnd);
-
-    // TEMP: basic insert without program mapping logic
-    const insertBooking = `
-      INSERT INTO bookings (
-        program_id,
-        user_id,
-        cal_booking_id,
-        attendee_name,
-        attendee_email,
-        status,
-        event_start,
-        event_end,
-        created_at
-      )
-      VALUES (NULL, NULL, $1, $2, $3, 'confirmed', $4, $5, NOW())
-      ON CONFLICT (cal_booking_id) DO NOTHING
-      RETURNING *;
-    `;
-
-    const params = [
-      calBookingId,
-      attendeeName,
-      attendeeEmail,
-      eventStart ? new Date(eventStart) : null,
-      eventEnd ? new Date(eventEnd) : null,
-    ];
-
-    const result = await pool.query(insertBooking, params);
-    console.log("✅ Booking insert result:", result.rows);
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("💥 Cal webhook error:", err);
-    return res.json({ success: false });
-  }
-});
-
-/* ------------------------------------------
    Admin Auth Middleware
 -------------------------------------------*/
 function requireAdmin(req, res, next) {
@@ -261,7 +191,6 @@ app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
       `
       SELECT
         b.id,
-        b.cal_booking_id,
         b.attendee_name,
         b.attendee_email,
         b.status,
@@ -287,12 +216,13 @@ app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
 });
 
 /* ------------------------------------------
-   Program + Announcement + cal Routes
+   Routes
 -------------------------------------------*/
 app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
-app.use("/api/cal", calRoutes);
-
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/cal", calRoutes); 
+app.use("/api/bookings", bookingRoutes);
 
 /* ------------------------------------------
    Start Server
