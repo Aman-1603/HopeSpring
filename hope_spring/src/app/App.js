@@ -59,6 +59,7 @@ import UserDashboard from "../features/user/pages/UserDashboard";
 import Profile from "../features/user/pages/Profile";
 import MyOrders from "../features/user/pages/MyOrders";
 import PastSessions from "../features/user/pages/PastSessions";
+import Support from "../components/Pages/Support/UsersSupport"
 
 
 
@@ -126,6 +127,11 @@ export default function App() {
           <Route path="/board-of-directors" element={<BoardOfDirectors />} />
           <Route path="/donors-and-partners" element={<DonorPartners />} />
           <Route path="/reports" element={<Reports />} />
+
+          {/* Users Support */}
+          <Route path="/support" element={<Support />} />
+
+
 
           {/* ===== ADMIN ROUTES ===== */}
           

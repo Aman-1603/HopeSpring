@@ -8,15 +8,11 @@ import { pool } from "./db.js";
 
 import programRoutes from "./routes/programRoutes.js";
 import announcementRoutes from "./routes/announcements.js";
-<<<<<<< HEAD
 import calRoutes from "./routes/calRoutes.js";
 import userRoutes from "../backend/routes/userRoutes.js";
 import calendarEventRoutes from "../backend/routes/calendarEvents.js";
 import donateRoutes from "../backend/routes/donateRoutes.js";
-=======
-import calRoutes from "./routes/calRoutes.js"; 
 import bookingRoutes from "./routes/bookingRoutes.js";
->>>>>>> fc15545 (Program Creation from Admin, Going to DB, Booking from FrontEnd)
 
 dotenv.config();
 
