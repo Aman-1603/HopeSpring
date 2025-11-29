@@ -1,24 +1,107 @@
-// hope_spring/backend/routes/programRoutes.js
+// backend/routes/programRoutes.js
 import express from "express";
 import { pool } from "../db.js";
 
 const router = express.Router();
 
+const TZ = "America/New_York"; // keep as-is unless HopeSpring wants different TZ
+
+/* =========================
+   Timezone-safe helpers
+========================= */
+
+// Get timezone offset (in minutes) of a given UTC date in a target timeZone
+function getTimeZoneOffsetMinutes(utcDate, timeZone) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const parts = dtf.formatToParts(utcDate);
+  const values = {};
+  for (const p of parts) {
+    if (p.type !== "literal") {
+      values[p.type] = p.value;
+    }
+  }
+
+  const asUTC = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+
+  return (asUTC - utcDate.getTime()) / 60000;
+}
+
+// Convert NY local date+time ("YYYY-MM-DD", "HH:mm") to a UTC Date
+function nyLocalToUtc(dateStr, timeStr, timeZone = TZ) {
+  if (!dateStr || !timeStr) return null;
+
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [hh, mm] = timeStr.split(":").map(Number);
+
+  // First guess: treat local as UTC
+  const utcGuess = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
+
+  // Figure out real offset for that instant in the target TZ
+  const offsetMin = getTimeZoneOffsetMinutes(utcGuess, timeZone);
+
+  // Shift back to get true UTC instant for the local time
+  return new Date(utcGuess.getTime() - offsetMin * 60000);
+}
+
 /* =========================================================
    GET ALL PROGRAMS (ADMIN)
-   GET /api/programs
+   ⚠️ participants = COUNT(bookings where status='ACCEPTED')
 ========================================================= */
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        id, title, description, category,
-        date, time, location, max_capacity, instructor, status,
-        participants,
-        day_label, time_label, column_index, sort_order, is_active,
-        cal_event_type_id, cal_slug, cal_user
-      FROM programs
-      ORDER BY date ASC NULLS LAST, time ASC NULLS LAST, id ASC
+        p.id,
+        p.title,
+        p.description,
+        p.category,
+        p.date,
+        p.time,
+        p.location,
+        p.max_capacity,
+        p.instructor,
+        p.status,
+
+        COALESCE(b.count_accepted, 0) AS participants,
+
+        p.day_label,
+        p.time_label,
+        p.column_index,
+        p.sort_order,
+        p.is_active,
+        p.cal_event_type_id,
+        p.cal_slug,
+        p.cal_user,
+        p.cal_schedule_id,
+        p.duration_minutes,
+        p.zoom_link,
+        p.subcategory              -- 👈 NEW
+      FROM programs p
+      LEFT JOIN (
+        SELECT
+          program_id,
+          COUNT(*) FILTER (WHERE status = 'ACCEPTED') AS count_accepted
+        FROM bookings
+        GROUP BY program_id
+      ) b ON b.program_id = p.id
+      ORDER BY p.date ASC NULLS LAST, p.time ASC NULLS LAST, p.id ASC
     `);
 
     res.json(result.rows);
@@ -29,20 +112,39 @@ router.get("/", async (req, res) => {
 });
 
 /* =========================================================
-   PUBLIC: SUPPORT GROUPS (CARDS)
-   GET /api/programs/support-groups
-   MUST be ABOVE any /:id routes
+   SUPPORT GROUPS
+   ⚠️ participants = COUNT(bookings where status='ACCEPTED')
 ========================================================= */
 router.get("/support-groups", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        id, title, description, instructor,
-        day_label, time_label, column_index, sort_order,
-        cal_event_type_id, cal_slug, cal_user
-      FROM programs
-      WHERE category='support_group' AND is_active=TRUE
-      ORDER BY column_index ASC, sort_order ASC, id ASC
+        p.id,
+        p.title,
+        p.description,
+        p.instructor,
+        p.day_label,
+        p.time_label,
+        p.column_index,
+        p.sort_order,
+        p.cal_event_type_id,
+        p.cal_slug,
+        p.cal_user,
+        p.cal_schedule_id,
+        p.zoom_link,
+        p.duration_minutes,
+        p.subcategory,             -- 👈 NEW (not strictly needed but nice)
+        COALESCE(b.count_accepted, 0) AS participants
+      FROM programs p
+      LEFT JOIN (
+        SELECT
+          program_id,
+          COUNT(*) FILTER (WHERE status = 'ACCEPTED') AS count_accepted
+        FROM bookings
+        GROUP BY program_id
+      ) b ON b.program_id = p.id
+      WHERE p.category = 'support_group' AND p.is_active = TRUE
+      ORDER BY p.column_index ASC, p.sort_order ASC, p.id ASC
     `);
 
     res.json(result.rows);
@@ -53,12 +155,8 @@ router.get("/support-groups", async (req, res) => {
 });
 
 /* =========================================================
-   CATEGORIES (fixed routes first)
+   CATEGORIES CRUD
 ========================================================= */
-
-/* GET all categories
-   GET /api/programs/categories/all
-*/
 router.get("/categories/all", async (req, res) => {
   try {
     const result = await pool.query(
@@ -71,9 +169,6 @@ router.get("/categories/all", async (req, res) => {
   }
 });
 
-/* ADD category
-   POST /api/programs/categories
-*/
 router.post("/categories", async (req, res) => {
   try {
     const { name } = req.body;
@@ -99,9 +194,6 @@ router.post("/categories", async (req, res) => {
   }
 });
 
-/* DELETE category
-   DELETE /api/programs/categories/:name
-*/
 router.delete("/categories/:name", async (req, res) => {
   try {
     const name = decodeURIComponent(req.params.name);
@@ -114,15 +206,13 @@ router.delete("/categories/:name", async (req, res) => {
 });
 
 /* =========================================================
-   DELETE SINGLE OCCURRENCE (fixed prefix)
-   DELETE /api/programs/occurrence/:occId
+   DELETE SINGLE OCCURRENCE
 ========================================================= */
 router.delete("/occurrence/:occId", async (req, res) => {
   try {
-    await pool.query(
-      `DELETE FROM program_occurrences WHERE id=$1`,
-      [req.params.occId]
-    );
+    await pool.query(`DELETE FROM program_occurrences WHERE id=$1`, [
+      req.params.occId,
+    ]);
     res.json({ message: "Occurrence deleted" });
   } catch (err) {
     console.error("❌ Error deleting occurrence:", err);
@@ -132,7 +222,6 @@ router.delete("/occurrence/:occId", async (req, res) => {
 
 /* =========================================================
    GET OCCURRENCES FOR A PROGRAM
-   GET /api/programs/:id/occurrences
 ========================================================= */
 router.get("/:id/occurrences", async (req, res) => {
   try {
@@ -153,8 +242,8 @@ router.get("/:id/occurrences", async (req, res) => {
 });
 
 /* =========================================================
-   ADD PROGRAM + OCCURRENCES
-   POST /api/programs
+   ADD PROGRAM
+   ✅ Cal fields are just stored; availability is owned by Cal dashboard
 ========================================================= */
 router.post("/", async (req, res) => {
   const client = await pool.connect();
@@ -171,77 +260,110 @@ router.post("/", async (req, res) => {
       maxCapacity,
       instructor,
       status,
-
-      // support-group fields
       day_label,
       time_label,
       column_index,
       sort_order,
       is_active,
-
-      // extra session dates from admin (datetime-local strings)
       additionalDates = [],
+
+      // new fields
+      durationMinutes,
+      zoomLink,
+
+      // optional Cal fields from admin (per-program only)
+      cal_event_type_id,
+      cal_schedule_id,
+      cal_slug,
+      cal_user,
+
+      // NEW
+      subcategory,
     } = req.body;
 
-    // 1) Insert program
+    const baseDate = date ? String(date).slice(0, 10) : null;
+    const baseTime = time ? String(time).slice(0, 5) : null;
+
+    const finalCalEventTypeId = cal_event_type_id ?? null;
+    const finalCalScheduleId = cal_schedule_id ?? null;
+
     const programInsert = await client.query(
       `
       INSERT INTO programs (
         title, description, category, date, time, location,
         max_capacity, instructor, status,
-        day_label, time_label, column_index, sort_order, is_active
+        day_label, time_label, column_index, sort_order, is_active,
+        cal_event_type_id, cal_schedule_id, cal_slug, cal_user,
+        duration_minutes, zoom_link, subcategory
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      VALUES (
+        $1,$2,$3,$4,$5,$6,
+        $7,$8,$9,
+        $10,$11,$12,$13,$14,
+        $15,$16,$17,$18,
+        $19,$20,$21
+      )
       RETURNING *
       `,
       [
         title,
         description,
         category,
-        date || null,
-        time || null,
+        baseDate || null,
+        baseTime || null,
         location,
         maxCapacity,
         instructor,
         status || "upcoming",
-
         day_label || null,
         time_label || null,
         column_index || 1,
         sort_order || 0,
         is_active ?? true,
+        finalCalEventTypeId,
+        finalCalScheduleId,
+        cal_slug ?? null,
+        cal_user ?? null,
+        durationMinutes != null ? durationMinutes : null,
+        zoomLink ?? null,
+        subcategory ?? null,
       ]
     );
 
     const createdProgram = programInsert.rows[0];
     const programId = createdProgram.id;
 
-    // 2) Insert main occurrence (from date + time)
-    if (date && time) {
-      const mainStartsAt = new Date(`${date}T${time}`);
-      await client.query(
-        `
-        INSERT INTO program_occurrences (program_id, starts_at)
-        VALUES ($1, $2)
-        `,
-        [programId, mainStartsAt]
-      );
+    // main occurrence (NY local -> UTC instant)
+    if (baseDate && baseTime) {
+      const startsAtUTC = nyLocalToUtc(baseDate, baseTime);
+      if (startsAtUTC) {
+        await client.query(
+          `INSERT INTO program_occurrences (program_id, starts_at)
+           VALUES ($1, $2)`,
+          [programId, startsAtUTC]
+        );
+      }
     }
 
-    // 3) Insert additional occurrences
-    for (const dt of additionalDates) {
-      if (!dt) continue;
-      const startsAt = new Date(dt);
+    // extra occurrences -> FORCE primary time
+    for (const d of additionalDates) {
+      if (!d) continue;
+      const extraDate = String(d).slice(0, 10);
+      if (!extraDate || !baseTime) continue;
+
+      const startsAtUTC = nyLocalToUtc(extraDate, baseTime);
+      if (!startsAtUTC) continue;
+
       await client.query(
-        `
-        INSERT INTO program_occurrences (program_id, starts_at)
-        VALUES ($1, $2)
-        `,
-        [programId, startsAt]
+        `INSERT INTO program_occurrences (program_id, starts_at)
+         VALUES ($1, $2)`,
+        [programId, startsAtUTC]
       );
     }
 
     await client.query("COMMIT");
+
+    // ❌ NO Cal sync here. Cal dashboard is the source of availability.
     res.status(201).json(createdProgram);
   } catch (err) {
     await client.query("ROLLBACK");
@@ -253,36 +375,63 @@ router.post("/", async (req, res) => {
 });
 
 /* =========================================================
-   EDIT PROGRAM (+ optional replace occurrences)
-   PUT /api/programs/:id
+   EDIT PROGRAM (partial update + optional occurrence replace)
+   ✅ Cal fields are just stored; no schedule updates
 ========================================================= */
 router.put("/:id", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const {
-      title,
-      description,
-      category,
-      date,
-      time,
-      location,
-      maxCapacity,
-      instructor,
-      status,
+    const programId = req.params.id;
 
-      day_label,
-      time_label,
-      column_index,
-      sort_order,
-      is_active,
+    // 1) Load existing row for merge (prevents NULL overwrite)
+    const currentRes = await client.query(
+      `SELECT * FROM programs WHERE id=$1`,
+      [programId]
+    );
+    const current = currentRes.rows[0];
+    if (!current) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Program not found" });
+    }
 
-      // if passed, we replace occurrences
-      additionalDates,
-    } = req.body;
+    // 2) Merge request over existing
+    const merged = { ...current, ...req.body };
 
-    // 1) Update program
+    // Handle camelCase -> snake
+    if (req.body.maxCapacity != null) {
+      merged.max_capacity = req.body.maxCapacity;
+    }
+    if (req.body.durationMinutes != null) {
+      merged.duration_minutes = req.body.durationMinutes;
+    }
+    if (req.body.zoomLink !== undefined) {
+      merged.zoom_link = req.body.zoomLink;
+    }
+    if (req.body.subcategory !== undefined) {
+      merged.subcategory = req.body.subcategory;
+    }
+
+    const baseDate = merged.date ? String(merged.date).slice(0, 10) : null;
+    const baseTime = merged.time ? String(merged.time).slice(0, 5) : null;
+
+    const finalCalEventTypeId =
+      req.body.cal_event_type_id !== undefined
+        ? req.body.cal_event_type_id
+        : current.cal_event_type_id;
+
+    const finalCalScheduleId =
+      req.body.cal_schedule_id !== undefined
+        ? req.body.cal_schedule_id
+        : current.cal_schedule_id;
+
+    const finalCalSlug =
+      req.body.cal_slug !== undefined ? req.body.cal_slug : current.cal_slug;
+
+    const finalCalUser =
+      req.body.cal_user !== undefined ? req.body.cal_user : current.cal_user;
+
     const programUpdate = await client.query(
       `
       UPDATE programs SET
@@ -291,68 +440,77 @@ router.put("/:id", async (req, res) => {
         max_capacity=$7, instructor=$8, status=$9,
         day_label=$10, time_label=$11, column_index=$12,
         sort_order=$13, is_active=$14,
-        updated_at=NOW()
-      WHERE id=$15
+        cal_event_type_id=$15, cal_schedule_id=$16, cal_slug=$17, cal_user=$18,
+        duration_minutes=$19, zoom_link=$20, subcategory=$21
+      WHERE id=$22
       RETURNING *
       `,
       [
-        title,
-        description,
-        category,
-        date || null,
-        time || null,
-        location,
-        maxCapacity,
-        instructor,
-        status,
-
-        day_label || null,
-        time_label || null,
-        column_index || 1,
-        sort_order || 0,
-        is_active ?? true,
-
-        req.params.id,
+        merged.title,
+        merged.description,
+        merged.category,
+        baseDate,
+        baseTime,
+        merged.location,
+        merged.max_capacity,
+        merged.instructor,
+        merged.status,
+        merged.day_label,
+        merged.time_label,
+        merged.column_index ?? 1,
+        merged.sort_order ?? 0,
+        merged.is_active ?? true,
+        finalCalEventTypeId ?? null,
+        finalCalScheduleId ?? null,
+        finalCalSlug ?? null,
+        finalCalUser ?? null,
+        merged.duration_minutes ?? null,
+        merged.zoom_link ?? null,
+        merged.subcategory ?? null,
+        programId,
       ]
     );
 
-    const updatedProgram = programUpdate.rows[0];
-
-    // 2) If admin sent additionalDates, replace occurrences
-    if (Array.isArray(additionalDates)) {
-      const programId = req.params.id;
+    // 4) Replace occurrences ONLY if additionalDates is explicitly provided
+    if (Array.isArray(req.body.additionalDates)) {
+      const additionalDates = req.body.additionalDates;
 
       await client.query(
         `DELETE FROM program_occurrences WHERE program_id=$1`,
         [programId]
       );
 
-      if (date && time) {
-        const mainStartsAt = new Date(`${date}T${time}`);
-        await client.query(
-          `
-          INSERT INTO program_occurrences (program_id, starts_at)
-          VALUES ($1, $2)
-          `,
-          [programId, mainStartsAt]
-        );
+      if (baseDate && baseTime) {
+        const startsAtUTC = nyLocalToUtc(baseDate, baseTime);
+        if (startsAtUTC) {
+          await client.query(
+            `INSERT INTO program_occurrences (program_id, starts_at)
+             VALUES ($1, $2)`,
+            [programId, startsAtUTC]
+          );
+        }
       }
 
-      for (const dt of additionalDates) {
-        if (!dt) continue;
-        const startsAt = new Date(dt);
+      for (const d of additionalDates) {
+        if (!d) continue;
+        const extraDate = String(d).slice(0, 10);
+        if (!extraDate || !baseTime) continue;
+
+        const startsAtUTC = nyLocalToUtc(extraDate, baseTime);
+        if (!startsAtUTC) continue;
+
         await client.query(
-          `
-          INSERT INTO program_occurrences (program_id, starts_at)
-          VALUES ($1, $2)
-          `,
-          [programId, startsAt]
+          `INSERT INTO program_occurrences (program_id, starts_at)
+           VALUES ($1, $2)`,
+          [programId, startsAtUTC]
         );
       }
     }
 
     await client.query("COMMIT");
-    res.json(updatedProgram);
+
+    // ❌ NO Cal sync here either
+    res.json(programUpdate.rows[0]);
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("❌ Error updating program:", err);
@@ -363,8 +521,7 @@ router.put("/:id", async (req, res) => {
 });
 
 /* =========================================================
-   DELETE PROGRAM (CASCADE OCCURRENCES)
-   DELETE /api/programs/:id
+   DELETE PROGRAM
 ========================================================= */
 router.delete("/:id", async (req, res) => {
   try {

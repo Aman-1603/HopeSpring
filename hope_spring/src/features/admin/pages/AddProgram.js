@@ -1,52 +1,81 @@
-// AddProgram.js - FULL UPDATED FILE (support_group + occurrences + Cal integration)
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import AdminLayout from "../AdminLayout";
-import { CalendarDays, MapPin, Users, User, PlusCircle, Tag, Link2, CheckCircle2, Loader2 } from "lucide-react";
-// Use relative path for proxy
+import {
+  CalendarDays,
+  MapPin,
+  Users,
+  User,
+  PlusCircle,
+  Tag,
+  CheckCircle2,
+  Loader2,
+  Link2,
+  Pencil,
+  Trash2,
+  Timer,
+} from "lucide-react";
+
 const API_BASE = "/api/programs";
 const CAL_BASE = "/api/cal";
 
-const ProgramManagement = () => {
+/** simple slugger used both in UI + save */
+const normalizeCategory = (v) =>
+  (v || "").trim().toLowerCase().replace(/\s+/g, "_");
+
+/** subcategories for Gentle Exercise */
+const GENTLE_EXERCISE_SUBCATS = ["Meditation", "Yoga", "Tai Chi", "Qi Gong"];
+
+const emptyForm = {
+  id: null,
+  title: "",
+  description: "",
+  category: "",
+  subcategory: "",
+
+  location: "",
+  maxCapacity: "",
+  instructor: "",
+  status: "upcoming",
+
+  // support group only
+  day_label: "",
+  time_label: "",
+  column_index: 1,
+  sort_order: 0,
+  is_active: true,
+
+  // duration in minutes (maps to duration_minutes in DB)
+  durationMinutes: "",
+};
+
+function formatDuration(mins) {
+  const m = Number(mins);
+  if (!m || m <= 0) return null;
+  const hours = Math.floor(m / 60);
+  const minutes = m % 60;
+
+  if (hours && minutes)
+    return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
+  if (hours) return `${hours} hr${hours > 1 ? "s" : ""}`;
+  return `${minutes} min`;
+}
+
+export default function ProgramManagement() {
   const [programs, setPrograms] = useState([]);
   const [categories, setCategories] = useState([]);
 
-  const [showAddProgram, setShowAddProgram] = useState(false);
-  const [showCategories, setShowCategories] = useState(false);
-
-  const [newCategory, setNewCategory] = useState("");
-
-  // track which program is creating Cal event right now
-  const [calLoadingId, setCalLoadingId] = useState(null);
-
-  const emptyForm = {
-    id: null, // for edit
-    title: "",
-    description: "",
-    category: "",
-    date: "",
-    time: "",
-    location: "",
-    maxCapacity: "",
-    instructor: "",
-    status: "upcoming",
-
-    // support groups only
-    day_label: "",
-    time_label: "",
-    column_index: 1, // 1 left, 2 right
-    sort_order: 0,
-    is_active: true,
-
-    // extra sessions (datetime-local strings)
-    additionalDates: [""],
-  };
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
 
   const [formData, setFormData] = useState(emptyForm);
-  const [isSaving, setIsSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch programs & categories on mount
+  const [newCategory, setNewCategory] = useState("");
+  const [calLoadingId, setCalLoadingId] = useState(null);
+
+  /* --------------------------- fetchers --------------------------- */
   useEffect(() => {
     fetchPrograms();
     fetchCategories();
@@ -55,164 +84,169 @@ const ProgramManagement = () => {
   const fetchPrograms = async () => {
     try {
       const res = await axios.get(API_BASE);
-      const mapped = res.data.map((p) => ({
-        id: p.id,
-        title: p.title,
-        description: p.description,
-        category: p.category,
-        date: p.date,
-        time: p.time,
-        location: p.location,
-        participants: p.participants || 0,
-        maxCapacity: p.max_capacity,
-        status: p.status,
-        instructor: p.instructor,
-
-        // support groups
-        day_label: p.day_label,
-        time_label: p.time_label,
-        column_index: p.column_index,
-        sort_order: p.sort_order,
-        is_active: p.is_active,
-
-        // Cal fields
-        cal_event_type_id: p.cal_event_type_id,
-        cal_slug: p.cal_slug,
-        cal_user: p.cal_user,
-      }));
-      setPrograms(mapped);
-    } catch (err) {
-      console.error("Error fetching programs:", err);
+      setPrograms(res.data || []);
+    } catch (e) {
+      console.error("fetchPrograms:", e);
     }
   };
 
   const fetchCategories = async () => {
     try {
       const res = await axios.get(`${API_BASE}/categories/all`);
-      setCategories(res.data.map((c) => c.name));
-    } catch (err) {
-      console.error("Error fetching categories:", err);
+      setCategories((res.data || []).map((c) => c.name));
+    } catch (e) {
+      console.error("fetchCategories:", e);
     }
   };
+  /* --------------------------------------------------------------- */
 
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const openAddProgramModal = () => {
+  const openAdd = () => {
     setEditMode(false);
-    setFormData(emptyForm);
-    setShowAddProgram(true);
+    setFormData({ ...emptyForm });
+    setShowProgramModal(true);
   };
 
-  // fetch occurrences on edit and prefill additionalDates
-  const openEditProgram = async (program) => {
+  const openEdit = async (p) => {
     setEditMode(true);
 
-    let additionalDatesPrefill = [""];
-
+    // still fetch occurrences for legacy/analytics, but not shown in form
     try {
-      const occRes = await axios.get(
-        `${API_BASE}/${program.id}/occurrences`
-      );
-
-      const occs = occRes.data || [];
-      occs.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-
-      const extra = occs.slice(1).map((o) => {
-        const d = new Date(o.starts_at);
-        return d.toISOString().slice(0, 16);
-      });
-
-      additionalDatesPrefill = extra.length ? extra : [""];
-    } catch (e) {
-      console.warn("Could not prefill occurrences, using empty extras.");
+      await axios.get(`${API_BASE}/${p.id}/occurrences`);
+    } catch {
+      // ignore
     }
 
     setFormData({
-      id: program.id,
-      title: program.title,
-      description: program.description,
-      category: program.category,
-      date: program.date,
-      time: program.time,
-      location: program.location,
-      maxCapacity: program.maxCapacity,
-      instructor: program.instructor,
-      status: program.status,
+      id: p.id,
+      title: p.title || "",
+      description: p.description || "",
+      category: p.category || "",
+      subcategory: p.subcategory || "",
+      location: p.location || "",
+      maxCapacity: p.max_capacity ?? "",
+      instructor: p.instructor || "",
+      status: p.status || "upcoming",
 
-      day_label: program.day_label || "",
-      time_label: program.time_label || "",
-      column_index: program.column_index || 1,
-      sort_order: program.sort_order || 0,
-      is_active: program.is_active ?? true,
+      day_label: p.day_label || "",
+      time_label: p.time_label || "",
+      column_index: p.column_index || 1,
+      sort_order: p.sort_order || 0,
+      is_active: p.is_active ?? true,
 
-      additionalDates: additionalDatesPrefill,
+      durationMinutes:
+        p.duration_minutes !== null && p.duration_minutes !== undefined
+          ? String(p.duration_minutes)
+          : "",
     });
 
-    setShowAddProgram(true);
+    setShowProgramModal(true);
   };
 
-  // Create Cal event-type for a program
-  // quiet=true means "don’t alert"
-  const handleCreateCalEvent = async (programId, { quiet = false } = {}) => {
+  const closeProgramModal = () => {
+    setShowProgramModal(false);
+    setEditMode(false);
+    setFormData(emptyForm);
+  };
+
+  /* --------------------------- Cal --------------------------- */
+  const createCalEventType = async (programId, quiet = false) => {
     try {
       setCalLoadingId(programId);
+
       const res = await axios.post(`${CAL_BASE}/event-types/${programId}`);
+      // backend: { linked, program, cal: { eventTypeId, scheduleId, slug, user } }
+      const body = res.data || {};
+      const calInfo = body.cal || {};
+
       await fetchPrograms();
 
       if (!quiet) {
         alert(
-          `Cal event linked.\nID: ${res.data.cal_event_type_id}\nSlug: ${res.data.cal_slug}`
+          `Cal linked.\nID: ${calInfo.eventTypeId ?? "?"}\nSlug: ${
+            calInfo.slug ?? "?"
+          }`
         );
       }
-
-      return res.data;
-    } catch (err) {
-      console.error("Cal create error:", err);
-      if (!quiet) {
-        alert(err?.response?.data?.error || "Failed to create Cal event type.");
-      }
-      throw err;
+    } catch (e) {
+      console.error("createCalEventType:", e);
+      if (!quiet) alert(e?.response?.data?.error || "Cal linking failed");
+      throw e;
     } finally {
       setCalLoadingId(null);
     }
   };
 
-  const handleAddOrUpdateProgram = async () => {
-    const required = [
+  // sync Cal "Offer seats" with program max_capacity
+  const syncCalSeats = async (programId) => {
+    try {
+      await axios.post(`${CAL_BASE}/programs/${programId}/sync-seats`);
+    } catch (e) {
+      console.error("syncCalSeats:", e);
+      // silent; Cal may not be linked yet
+    }
+  };
+
+  // sync Cal duration (duration_minutes -> lengthInMinutes)
+  const syncCalDuration = async (programId) => {
+    try {
+      await axios.post(`${CAL_BASE}/programs/${programId}/sync-duration`);
+    } catch (e) {
+      console.error("syncCalDuration:", e);
+      // silent; Cal may not be linked yet
+    }
+  };
+  /* ---------------------------------------------------------- */
+
+  /* ---------------------- save/delete programs ---------------------- */
+  const saveProgram = async () => {
+    const normalizedCategoryValue = normalizeCategory(formData.category);
+    const isSupportGroup = normalizedCategoryValue === "support_group";
+    const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
+
+    // any category that should automatically be wired to Cal
+    const wantsCalIntegration = isSupportGroup || isGentleExercise;
+
+    const storedCategory = isSupportGroup
+      ? "support_group"
+      : formData.category;
+
+    const baseRequired = [
       "title",
       "description",
       "category",
-      "date",
-      "time",
       "location",
       "maxCapacity",
       "instructor",
+      "durationMinutes", // duration required so Cal length is never undefined
     ];
-    for (let f of required) {
-      if (!formData[f]) {
-        alert("Please fill in all required fields");
-        return;
+
+    for (const f of baseRequired) {
+      if (!formData[f]) return alert("Fill all required fields.");
+    }
+
+    if (isSupportGroup) {
+      if (!formData.day_label || !formData.time_label) {
+        return alert("Support group needs Day Label and Time Label.");
       }
     }
 
-    if (formData.category === "support_group") {
-      if (!formData.day_label || !formData.time_label) {
-        alert("Please fill Day Label and Time Label for support groups");
-        return;
-      }
+    if (isGentleExercise && !formData.subcategory) {
+      return alert("Select a subcategory for Gentle Exercise.");
     }
 
     const payload = {
-      title: formData.title,
-      description: formData.description,
-      category: formData.category,
-      date: formData.date,
-      time: formData.time,
-      location: formData.location,
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      category: storedCategory,
+      subcategory: isGentleExercise ? formData.subcategory || null : null,
+
+      // scheduling is handled by Cal – keep these null
+      date: null,
+      time: null,
+
+      location: formData.location.trim(),
       maxCapacity: parseInt(formData.maxCapacity, 10),
-      instructor: formData.instructor,
+      instructor: formData.instructor.trim(),
       status: formData.status,
 
       day_label: formData.day_label || null,
@@ -221,134 +255,130 @@ const ProgramManagement = () => {
       sort_order: formData.sort_order || 0,
       is_active: formData.is_active ?? true,
 
-      additionalDates: (formData.additionalDates || []).filter(Boolean),
+      additionalDates: [],
+
+      durationMinutes:
+        formData.durationMinutes !== ""
+          ? parseInt(formData.durationMinutes, 10)
+          : null,
     };
 
     try {
       setIsSaving(true);
 
       if (editMode && formData.id) {
-        const res = await axios.put(
-          `${API_BASE}/${formData.id}`,
-          payload
-        );
+        // UPDATE
+        await axios.put(`${API_BASE}/${formData.id}`, payload);
+        await fetchPrograms();
 
-        // ✅ If already linked support_group, refresh Cal so dates match DB
-        if (
-          payload.category === "support_group" &&
-          res.data.cal_event_type_id
-        ) {
-          await axios.post(
-            `${CAL_BASE}/event-types/${formData.id}/refresh`
-          );
-          await fetchPrograms();
-        } else {
-          // normal refresh
-          await fetchPrograms();
+        if (wantsCalIntegration) {
+          await syncCalSeats(formData.id);
+          await syncCalDuration(formData.id);
         }
       } else {
+        // CREATE
         const res = await axios.post(API_BASE, payload);
-        const createdId = res.data.id;
+        const createdId = res.data?.id;
 
-        // ✅ Auto-link Cal for support groups
-        if (payload.category === "support_group") {
-          await handleCreateCalEvent(createdId, { quiet: true });
+        if (wantsCalIntegration && createdId) {
+          await createCalEventType(createdId, true);
+          await syncCalSeats(createdId);
+          await syncCalDuration(createdId);
         } else {
           await fetchPrograms();
         }
       }
 
-      setShowAddProgram(false);
-      setEditMode(false);
-      setFormData(emptyForm);
-    } catch (err) {
-      console.error("Error saving program:", err);
-      alert("Something went wrong while saving the program.");
+      closeProgramModal();
+    } catch (e) {
+      console.error("saveProgram:", e);
+      alert("Save failed. Check backend logs.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteProgram = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this program?"))
-      return;
+  const deleteProgram = async (id) => {
+    if (!window.confirm("Delete this program?")) return;
     try {
       await axios.delete(`${API_BASE}/${id}`);
       setPrograms((prev) => prev.filter((p) => p.id !== id));
-    } catch (err) {
-      console.error("Error deleting program:", err);
-      alert("Failed to delete program.");
+    } catch (e) {
+      console.error("deleteProgram:", e);
+      alert("Delete failed.");
     }
   };
+  /* ------------------------------------------------------------------ */
 
-  const handleAddCategory = async () => {
+  /* ---------------------- categories CRUD ---------------------- */
+  const addCategory = async () => {
     const name = newCategory.trim();
-    if (!name) {
-      alert("Category name cannot be empty");
-      return;
-    }
+    if (!name) return;
+
     try {
       const res = await axios.post(`${API_BASE}/categories`, { name });
-      if (res.data.existing) {
-        alert("Category already exists");
-      } else {
+      if (!res.data.existing) {
         setCategories((prev) => [...prev, res.data.name]);
       }
       setNewCategory("");
-    } catch (err) {
-      console.error("Error adding category:", err);
-      alert("Failed to add category.");
+    } catch (e) {
+      console.error("addCategory:", e);
+      alert("Category add failed.");
     }
   };
 
-  const handleDeleteCategory = async (cat) => {
+  const deleteCategory = async (cat) => {
     if (!window.confirm("Delete this category?")) return;
     try {
-      await axios.delete(
-        `${API_BASE}/categories/${encodeURIComponent(cat)}`
-      );
+      await axios.delete(`${API_BASE}/categories/${encodeURIComponent(cat)}`);
       setCategories((prev) => prev.filter((c) => c !== cat));
-    } catch (err) {
-      console.error("Error deleting category:", err);
-      alert("Failed to delete category.");
+    } catch (e) {
+      console.error("deleteCategory:", e);
+      alert("Category delete failed.");
     }
   };
+  /* ------------------------------------------------------------ */
 
-  const totalParticipants = programs.reduce(
-    (sum, p) => sum + (p.participants || 0),
-    0
-  );
-  const upcomingCount = programs.filter(
-    (p) => p.status === "upcoming"
-  ).length;
-  const completedCount = programs.filter(
-    (p) => p.status === "completed"
-  ).length;
+  const stats = useMemo(() => {
+    const total = programs.length;
+    const upcoming = programs.filter((p) => p.status === "upcoming").length;
+    const completed = programs.filter((p) => p.status === "completed").length;
+    const participants = programs.reduce(
+      (s, p) => s + (p.participants || 0),
+      0
+    );
+    return { total, upcoming, completed, participants };
+  }, [programs]);
+
+  const normalizedCategoryValue = normalizeCategory(formData.category);
+  const isSupportGroup = normalizedCategoryValue === "support_group";
+  const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
 
   return (
     <AdminLayout>
       <div className="space-y-6 bg-gradient-to-b from-[#f7f5fb] to-[#f1f5ff] rounded-3xl p-6">
-        {/* header */}
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">
               Program Management
             </h1>
             <p className="text-gray-500 text-sm">
-              Create and manage HopeSpring support programs and wellness events.
+              Create programs and link Cal booking. Scheduling is managed in
+              Cal.com.
             </p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowCategories(true)}
-              className="flex items-center gap-1 border border-[#d0c8ff] text-[#6b5df5] px-3 py-2 rounded-xl text-sm bg-white hover:bg-[#f4f1ff] shadow-sm"
+              onClick={() => setShowCategoriesModal(true)}
+              className="flex items-center gap-1 border border-[#d0c8ff] text-[#6b5df5] px-3 py-2 rounded-xl text-sm bg-white hover:bg-[#f4f1ff]"
             >
               <Tag className="w-4 h-4" />
-              Manage Categories
+              Categories
             </button>
             <button
-              onClick={openAddProgramModal}
-              className="flex items-center gap-1 bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-4 py-2 rounded-xl text-sm shadow-md hover:shadow-lg hover:scale-[1.02] transition"
+              onClick={openAdd}
+              className="flex items-center gap-1 bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-4 py-2 rounded-xl text-sm shadow-md hover:shadow-lg"
             >
               <PlusCircle className="w-4 h-4" />
               Add Program
@@ -356,71 +386,64 @@ const ProgramManagement = () => {
           </div>
         </div>
 
-        {/* stats */}
+        {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white/80 border border-[#e5e0ff] rounded-2xl p-4 shadow-sm">
-            <p className="text-xs text-gray-500">Total Programs</p>
-            <div className="flex items-center justify-between mt-1">
-              <p className="text-2xl font-semibold text-gray-800">
-                {programs.length}
-              </p>
-              <CalendarDays className="w-6 h-6 text-[#9b87f5]" />
-            </div>
-          </div>
-          <div className="bg-white/80 border border-[#e0f5f3] rounded-2xl p-4 shadow-sm">
-            <p className="text-xs text-gray-500">Upcoming</p>
-            <div className="flex items-center justify-between mt-1">
-              <p className="text-2xl font-semibold text-gray-800">
-                {upcomingCount}
-              </p>
-              <Users className="w-6 h-6 text-[#67c6c6]" />
-            </div>
-          </div>
-          <div className="bg-white/80 border border-[#fde2e2] rounded-2xl p-4 shadow-sm">
-            <p className="text-xs text-gray-500">Completed</p>
-            <div className="flex items-center justify-between mt-1">
-              <p className="text-2xl font-semibold text-gray-800">
-                {completedCount}
-              </p>
-              <CalendarDays className="w-6 h-6 text-[#f97373]" />
-            </div>
-          </div>
-          <div className="bg-white/80 border border-[#e5e7eb] rounded-2xl p-4 shadow-sm">
-            <p className="text-xs text-gray-500">Total Participants</p>
-            <div className="flex items-center justify-between mt-1">
-              <p className="text-2xl font-semibold text-gray-800">
-                {totalParticipants}
-              </p>
-              <Users className="w-6 h-6 text-[#6b5df5]" />
-            </div>
-          </div>
+          <StatCard
+            label="Programs"
+            value={stats.total}
+            icon={<CalendarDays className="w-6 h-6 text-[#9b87f5]" />}
+          />
+          <StatCard
+            label="Upcoming"
+            value={stats.upcoming}
+            icon={<Users className="w-6 h-6 text-[#67c6c6]" />}
+          />
+          <StatCard
+            label="Completed"
+            value={stats.completed}
+            icon={<CalendarDays className="w-6 h-6 text-[#f97373]" />}
+          />
+          <StatCard
+            label="Participants"
+            value={stats.participants}
+            icon={<Users className="w-6 h-6 text-[#6b5df5]" />}
+          />
         </div>
 
-        {/* program cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {programs.map((program) => {
-            const linked = !!program.cal_event_type_id;
+        {/* Programs list */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {programs.map((p) => {
+            const pNormCategory = normalizeCategory(p.category);
+            const isSupportGroupRow = pNormCategory === "support_group";
+
+            const linked = !!p.cal_event_type_id;
             const bookingUrl =
-              linked && program.cal_user && program.cal_slug
-                ? `https://cal.com/${program.cal_user}/${program.cal_slug}`
+              linked && p.cal_user && p.cal_slug
+                ? `https://cal.com/${p.cal_user}/${p.cal_slug}`
                 : null;
+
+            const durationLabel = formatDuration(p.duration_minutes);
 
             return (
               <div
-                key={program.id}
-                className="bg-white rounded-2xl border border-[#e5e0ff] shadow-sm p-5 space-y-3 hover:shadow-lg transition"
+                key={p.id}
+                className="bg-white rounded-2xl border border-[#e5e0ff] shadow-sm p-5 space-y-3"
               >
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">
-                      {program.title}
+                      {p.title}
                     </h2>
-                    <div className="flex items-center gap-2 text-xs text-[#6b5df5] mt-1">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#f4f1ff] border border-[#e0d8ff]">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#f4f1ff] border border-[#e0d8ff] text-[#6b5df5]">
                         <Tag className="w-3 h-3" />
-                        {program.category || "Uncategorized"}
+                        {p.category || "uncategorized"}
                       </span>
-
+                      {p.subcategory && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ecfeff] border border-[#bae6fd] text-[#0284c7]">
+                          {p.subcategory}
+                        </span>
+                      )}
                       {linked && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
@@ -429,109 +452,116 @@ const ProgramManagement = () => {
                       )}
                     </div>
                     <p className="text-sm text-gray-500 mt-2">
-                      {program.description}
+                      {p.description}
                     </p>
                   </div>
+
                   <span
                     className={`text-xs px-2 py-1 rounded-full capitalize ${
-                      program.status === "upcoming"
+                      p.status === "upcoming"
                         ? "bg-green-100 text-green-700"
                         : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    {program.status}
+                    {p.status}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
+                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
                   <div className="flex items-center gap-1">
                     <CalendarDays className="w-4 h-4 text-[#9b87f5]" />
                     <span>
-                      {program.date} {program.time}
+                      {/* date/time kept only for legacy display; schedule is Cal-only */}
+                      {p.date} {p.time}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <MapPin className="w-4 h-4 text-[#67c6c6]" />
-                    <span>{program.location}</span>
+                    <span>{p.location}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Users className="w-4 h-4 text-[#6b5df5]" />
                     <span>
-                      {program.participants}/{program.maxCapacity} participants
+                      {p.participants || 0}/{p.max_capacity} participants
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <User className="w-4 h-4 text-[#f97373]" />
-                    <span>{program.instructor}</span>
+                    <span>{p.instructor}</span>
                   </div>
+                  {durationLabel && (
+                    <div className="flex items-center gap-1 col-span-2">
+                      <Timer className="w-4 h-4 text-[#9b87f5]" />
+                      <span>Duration: {durationLabel}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Support group meta */}
-                {program.category === "support_group" && (
+                {isSupportGroupRow && (
                   <div className="text-xs text-gray-500 flex flex-wrap gap-2">
                     <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Day: {program.day_label || "-"}
+                      Day: {p.day_label || "-"}
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      TimeLabel: {program.time_label || "-"}
+                      TimeLabel: {p.time_label || "-"}
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Column: {program.column_index === 2 ? "Right" : "Left"}
+                      Column: {p.column_index === 2 ? "Right" : "Left"}
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Order: {program.sort_order}
+                      Order: {p.sort_order || 0}
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Active: {program.is_active ? "Yes" : "No"}
+                      Active: {p.is_active ? "Yes" : "No"}
                     </span>
                   </div>
                 )}
 
-                {/* ✅ Cal actions (support groups only) */}
-                {program.category === "support_group" && (
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {!linked ? (
-                      <button
-                        onClick={() => handleCreateCalEvent(program.id)}
-                        disabled={calLoadingId === program.id}
-                        className="inline-flex items-center gap-1 border border-[#c7d2fe] px-3 py-1.5 rounded-xl text-sm text-[#4338ca] bg-[#eef2ff] hover:bg-[#e0e7ff] disabled:opacity-60"
-                      >
-                        {calLoadingId === program.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
-                        Create Cal Event
-                      </button>
-                    ) : bookingUrl ? (
-                      <a
-                        href={bookingUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 border border-emerald-200 px-3 py-1.5 rounded-xl text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
-                      >
+                {/* Cal link / button for ALL programs */}
+                <div className="pt-2">
+                  {!linked ? (
+                    <button
+                      onClick={() => createCalEventType(p.id)}
+                      disabled={calLoadingId === p.id}
+                      className="inline-flex items-center gap-1 border border-[#c7d2fe] px-3 py-1.5 rounded-xl text-sm text-[#4338ca] bg-[#eef2ff] hover:bg-[#e0e7ff] disabled:opacity-60"
+                    >
+                      {calLoadingId === p.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
                         <Link2 className="w-4 h-4" />
-                        Open Booking Link
-                      </a>
-                    ) : (
-                      <span className="text-xs text-gray-500">
-                        Cal linked, but missing user/slug.
-                      </span>
-                    )}
-                  </div>
-                )}
+                      )}
+                      Create Cal Event
+                    </button>
+                  ) : bookingUrl ? (
+                    <a
+                      href={bookingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 border border-emerald-200 px-3 py-1.5 rounded-xl text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Open Booking Link
+                    </a>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Cal linked but missing user/slug.
+                    </p>
+                  )}
+                </div>
 
                 <div className="flex gap-2 pt-2">
                   <button
-                    onClick={() => openEditProgram(program)}
-                    className="border border-[#d0c8ff] px-3 py-1.5 rounded-xl text-sm text-[#6b5df5] bg-white hover:bg-[#f5f3ff]"
+                    onClick={() => openEdit(p)}
+                    className="inline-flex items-center gap-1 border border-[#d0c8ff] px-3 py-1.5 rounded-xl text-sm text-[#6b5df5] bg-white hover:bg-[#f5f3ff]"
                   >
+                    <Pencil className="w-4 h-4" />
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDeleteProgram(program.id)}
-                    className="border border-[#fecaca] px-3 py-1.5 rounded-xl text-sm text-[#b91c1c] bg-white hover:bg-[#fee2e2]"
+                    onClick={() => deleteProgram(p.id)}
+                    className="inline-flex items-center gap-1 border border-[#fecaca] px-3 py-1.5 rounded-xl text-sm text-[#b91c1c] bg-white hover:bg-[#fee2e2]"
                   >
+                    <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
                 </div>
@@ -541,365 +571,338 @@ const ProgramManagement = () => {
 
           {programs.length === 0 && (
             <div className="text-center text-gray-500 text-sm col-span-full py-10">
-              No programs created yet. Click <strong>Add Program</strong> to
-              create your first event.
+              No programs yet. Click <strong>Add Program</strong>.
             </div>
           )}
         </div>
 
-        {/* Add / Edit Program modal */}
-        {showAddProgram && (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-3xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-              <button
-                onClick={() => {
-                  setShowAddProgram(false);
-                  setEditMode(false);
-                }}
-                className="absolute top-4 right-6 text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
+        {/* Program modal */}
+        {showProgramModal && (
+          <Modal onClose={closeProgramModal}>
+            <h2 className="text-xl font-semibold text-gray-800">
+              {editMode ? "Edit Program" : "Add New Program"}
+            </h2>
 
-              <h2 className="text-xl font-semibold text-gray-800 mb-1">
-                {editMode ? "Edit Program" : "Add New Program"}
-              </h2>
+            <div className="grid gap-4 mt-4">
+              <Field label="Program Title *">
+                <input
+                  className="w-full border rounded-xl px-3 py-2 text-sm"
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, title: e.target.value }))
+                  }
+                />
+              </Field>
 
-              <div className="grid gap-4">
-                {/* title */}
-                <div>
-                  <label className="text-sm font-medium">Program Title *</label>
+              <Field label="Description *">
+                <textarea
+                  rows={3}
+                  className="w-full border rounded-xl px-3 py-2 text-sm"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData((p) => ({
+                      ...p,
+                      description: e.target.value,
+                    }))
+                  }
+                />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Category *">
+                  <select
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        category: e.target.value,
+                        subcategory: "",
+                      }))
+                    }
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Instructor *">
                   <input
                     className="w-full border rounded-xl px-3 py-2 text-sm"
-                    value={formData.title}
+                    value={formData.instructor}
                     onChange={(e) =>
-                      handleInputChange("title", e.target.value)
+                      setFormData((p) => ({
+                        ...p,
+                        instructor: e.target.value,
+                      }))
                     }
                   />
-                </div>
+                </Field>
+              </div>
 
-                {/* description */}
-                <div>
-                  <label className="text-sm font-medium">Description *</label>
-                  <textarea
+              {isGentleExercise && (
+                <Field label="Subcategory *">
+                  <select
                     className="w-full border rounded-xl px-3 py-2 text-sm"
-                    rows={3}
-                    value={formData.description}
+                    value={formData.subcategory}
                     onChange={(e) =>
-                      handleInputChange("description", e.target.value)
+                      setFormData((p) => ({
+                        ...p,
+                        subcategory: e.target.value,
+                      }))
                     }
-                  />
-                </div>
+                  >
+                    <option value="">Select subcategory</option>
+                    {GENTLE_EXERCISE_SUBCATS.map((sc) => (
+                      <option key={sc} value={sc}>
+                        {sc}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
-                {/* category + instructor */}
+              {isSupportGroup && (
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Category *</label>
+                  <Field label="Day Label *">
+                    <input
+                      className="w-full border rounded-xl px-3 py-2 text-sm"
+                      value={formData.day_label}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          day_label: e.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Time Label *">
+                    <input
+                      className="w-full border rounded-xl px-3 py-2 text-sm"
+                      value={formData.time_label}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          time_label: e.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Column">
                     <select
                       className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.category}
+                      value={formData.column_index}
                       onChange={(e) =>
-                        handleInputChange("category", e.target.value)
+                        setFormData((p) => ({
+                          ...p,
+                          column_index: parseInt(e.target.value, 10),
+                        }))
                       }
                     >
-                      <option value="">Select category</option>
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
+                      <option value={1}>Left</option>
+                      <option value={2}>Right</option>
                     </select>
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="text-sm font-medium">Instructor *</label>
-                    <input
-                      className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.instructor}
-                      onChange={(e) =>
-                        handleInputChange("instructor", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* Support group conditional fields */}
-                {formData.category === "support_group" && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium">
-                        Day Label *
-                      </label>
-                      <input
-                        className="w-full border rounded-xl px-3 py-2 text-sm"
-                        value={formData.day_label}
-                        onChange={(e) =>
-                          handleInputChange("day_label", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">
-                        Time Label *
-                      </label>
-                      <input
-                        className="w-full border rounded-xl px-3 py-2 text-sm"
-                        value={formData.time_label}
-                        onChange={(e) =>
-                          handleInputChange("time_label", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">Column</label>
-                      <select
-                        className="w-full border rounded-xl px-3 py-2 text-sm"
-                        value={formData.column_index}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "column_index",
-                            parseInt(e.target.value, 10)
-                          )
-                        }
-                      >
-                        <option value={1}>Left</option>
-                        <option value={2}>Right</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">Sort Order</label>
-                      <input
-                        type="number"
-                        className="w-full border rounded-xl px-3 py-2 text-sm"
-                        value={formData.sort_order}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "sort_order",
-                            parseInt(e.target.value, 10)
-                          )
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 col-span-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.is_active}
-                        onChange={(e) =>
-                          handleInputChange("is_active", e.target.checked)
-                        }
-                      />
-                      <label className="text-sm font-medium">Active</label>
-                    </div>
-                  </div>
-                )}
-
-                {/* main date + time */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Date *</label>
-                    <input
-                      type="date"
-                      className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.date}
-                      onChange={(e) =>
-                        handleInputChange("date", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Time *</label>
-                    <input
-                      type="time"
-                      className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.time}
-                      onChange={(e) =>
-                        handleInputChange("time", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* Additional session dates */}
-                <div>
-                  <label className="text-sm font-medium">
-                    Additional Session Dates (optional)
-                  </label>
-
-                  {formData.additionalDates.map((d, i) => (
-                    <div key={i} className="flex gap-2 mt-2">
-                      <input
-                        type="datetime-local"
-                        value={d}
-                        onChange={(e) => {
-                          const copy = [...formData.additionalDates];
-                          copy[i] = e.target.value;
-                          handleInputChange("additionalDates", copy);
-                        }}
-                        className="flex-1 border rounded-xl px-3 py-2 text-sm"
-                      />
-
-                      {i > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const copy = [...formData.additionalDates];
-                            copy.splice(i, 1);
-                            handleInputChange("additionalDates", copy);
-                          }}
-                          className="px-3 py-2 text-xs border rounded-xl"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleInputChange("additionalDates", [
-                        ...formData.additionalDates,
-                        "",
-                      ])
-                    }
-                    className="mt-2 text-xs px-3 py-2 border rounded-xl bg-gray-50"
-                  >
-                    + Add another date
-                  </button>
-                </div>
-
-                {/* location + capacity */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Location *</label>
-                    <input
-                      className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.location}
-                      onChange={(e) =>
-                        handleInputChange("location", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">
-                      Max Capacity *
-                    </label>
+                  <Field label="Sort Order">
                     <input
                       type="number"
                       className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.maxCapacity}
+                      value={formData.sort_order}
                       onChange={(e) =>
-                        handleInputChange("maxCapacity", e.target.value)
+                        setFormData((p) => ({
+                          ...p,
+                          sort_order: parseInt(e.target.value, 10),
+                        }))
                       }
                     />
-                  </div>
-                </div>
+                  </Field>
 
-                {/* status */}
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <select
+                  <label className="col-span-2 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_active}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          is_active: e.target.checked,
+                        }))
+                      }
+                    />
+                    Active
+                  </label>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Location *">
+                  <input
                     className="w-full border rounded-xl px-3 py-2 text-sm"
-                    value={formData.status}
+                    value={formData.location}
                     onChange={(e) =>
-                      handleInputChange("status", e.target.value)
+                      setFormData((p) => ({ ...p, location: e.target.value }))
                     }
-                  >
-                    <option value="upcoming">Upcoming</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
+                  />
+                </Field>
 
-                {/* actions */}
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setShowAddProgram(false);
-                      setEditMode(false);
-                    }}
-                    className="border px-4 py-2 rounded-xl text-sm bg-gray-50 hover:bg-gray-100"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAddOrUpdateProgram}
-                    disabled={isSaving}
-                    className="bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-5 py-2 rounded-xl text-sm shadow-md hover:shadow-lg disabled:opacity-60"
-                  >
-                    {isSaving
-                      ? "Saving..."
-                      : editMode
-                      ? "Save Changes"
-                      : "Add Program"}
-                  </button>
-                </div>
+                <Field label="Max Capacity *">
+                  <input
+                    type="number"
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    value={formData.maxCapacity}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        maxCapacity: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Manage categories modal */}
-        {showCategories && (
-          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
-              <button
-                onClick={() => setShowCategories(false)}
-                className="absolute top-4 right-6 text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
-
-              <h2 className="text-lg font-semibold text-gray-800 mb-1">
-                Manage Categories
-              </h2>
-
-              <div className="flex gap-2 mb-4">
+              <Field label="Program Duration (minutes) *">
                 <input
-                  className="flex-1 border rounded-xl px-3 py-2 text-sm"
-                  placeholder="New category name"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                  type="number"
+                  min={1}
+                  className="w-full border rounded-xl px-3 py-2 text-sm"
+                  value={formData.durationMinutes}
+                  onChange={(e) =>
+                    setFormData((p) => ({
+                      ...p,
+                      durationMinutes: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. 60"
                 />
-                <button
-                  onClick={handleAddCategory}
-                  className="bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-4 py-2 rounded-xl text-sm shadow-sm"
+              </Field>
+
+              <Field label="Status">
+                <select
+                  className="w-full border rounded-xl px-3 py-2 text-sm"
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, status: e.target.value }))
+                  }
                 >
-                  Add
+                  <option value="upcoming">Upcoming</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </Field>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={closeProgramModal}
+                  className="border px-4 py-2 rounded-xl text-sm bg-gray-50 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveProgram}
+                  disabled={isSaving}
+                  className="bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-5 py-2 rounded-xl text-sm shadow-md hover:shadow-lg disabled:opacity-60"
+                >
+                  {isSaving
+                    ? "Saving..."
+                    : editMode
+                    ? "Save Changes"
+                    : "Add Program"}
                 </button>
               </div>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {categories.map((cat) => (
-                  <div
-                    key={cat}
-                    className="flex items-center justify-between border border-[#e5e0ff] rounded-xl px-3 py-2 text-sm bg-[#fcfbff]"
-                  >
-                    <span>{cat}</span>
-                    <button
-                      onClick={() => handleDeleteCategory(cat)}
-                      className="text-red-500 text-xs hover:text-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-                {categories.length === 0 && (
-                  <p className="text-xs text-gray-500">
-                    No categories yet. Add one above to get started.
-                  </p>
-                )}
-              </div>
             </div>
-          </div>
+          </Modal>
+        )}
+
+        {/* Categories modal */}
+        {showCategoriesModal && (
+          <Modal onClose={() => setShowCategoriesModal(false)}>
+            <h2 className="text-lg font-semibold text-gray-800">
+              Manage Categories
+            </h2>
+
+            <div className="flex gap-2 mt-4">
+              <input
+                className="flex-1 border rounded-xl px-3 py-2 text-sm"
+                placeholder="New category"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addCategory()}
+              />
+              <button
+                onClick={addCategory}
+                className="bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-4 py-2 rounded-xl text-sm"
+              >
+                Add
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
+              {categories.map((cat) => (
+                <div
+                  key={cat}
+                  className="flex items-center justify-between border border-[#e5e0ff] rounded-xl px-3 py-2 text-sm bg-[#fcfbff]"
+                >
+                  <span>{cat}</span>
+                  <button
+                    onClick={() => deleteCategory(cat)}
+                    className="text-red-500 text-xs hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+
+              {categories.length === 0 && (
+                <p className="text-xs text-gray-500">No categories yet.</p>
+              )}
+            </div>
+          </Modal>
         )}
       </div>
     </AdminLayout>
   );
-};
+}
 
-export default ProgramManagement;
+/* ---------------------- tiny presentational bits ---------------------- */
+
+function StatCard({ label, value, icon }) {
+  return (
+    <div className="bg-white/80 border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-2xl font-semibold text-gray-800 mt-1">{value}</p>
+      </div>
+      {icon}
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="text-sm font-medium">{label}</label>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+function Modal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+      <div className="bg-white rounded-3xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-6 text-gray-500 hover:text-gray-800"
+        >
+          ✕
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}

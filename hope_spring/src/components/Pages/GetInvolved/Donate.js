@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import DonateWidget from "../DonateWidget";
 
 export default function Donate() {
   return (
@@ -30,25 +31,8 @@ export default function Donate() {
           <div className="bg-white/95 backdrop-blur rounded-2xl p-4 shadow-xl">
             {/* Example: Donorbox, FundraiseUp, Stripe, etc.
                Replace the box below with your provider’s iframe/script */}
-            <div className="border rounded-xl p-4">
-              <p className="font-semibold text-[#0b1c33]">Donate securely</p>
-              <p className="text-sm text-gray-600">
-                Add your donation widget embed here (iframe/script).
-              </p>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {["$35", "$50", "$75", "$100", "$250", "Other"].map((amt) => (
-                  <button
-                    key={amt}
-                    className="h-10 rounded-lg border bg-white font-semibold text-[#0b1c33] hover:bg-gray-50"
-                  >
-                    {amt}
-                  </button>
-                ))}
-              </div>
-              <button className="mt-4 w-full h-11 rounded-lg bg-[#0e2340] text-white font-semibold hover:brightness-110">
-                Donate
-              </button>
-            </div>
+                <DonateWidget />
+           
           </div>
         </div>
       </section>
@@ -138,7 +122,7 @@ export default function Donate() {
             ))}
           </div>
         </div>
-      </section>
+      </section>    
 
       {/* STORY + CTA */}
       <section className="py-10">

@@ -2,12 +2,29 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-/** Small atoms */
+/**
+ * API base – works for:
+ * - Vite:   VITE_API_BASE_URL
+ * - CRA:    REACT_APP_API_BASE_URL
+ * - Fallback: same-origin (empty string)
+ */
+const API_BASE =
+  import.meta.env?.VITE_API_BASE_URL ||
+  process.env.REACT_APP_API_BASE_URL ||
+  "";
+
+/** ---------- small atoms ---------- */
 const Badge = ({ children }) => (
   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 text-emerald-700 text-[13px] font-semibold px-3 py-1">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path d="M20 6l-11 11-5-5" stroke="currentColor" strokeWidth="2" />
     </svg>
+    {children}
+  </span>
+);
+
+const Pill = ({ children }) => (
+  <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 text-[12px] font-semibold px-3 py-1">
     {children}
   </span>
 );
@@ -24,57 +41,95 @@ const SectionTitle = ({ kicker, title, desc }) => (
   </div>
 );
 
-const ProgramCard = ({
-  title,
-  summary,
-  day,
-  time,
-  facilitator,
-  linked,
-  onRegister,
-}) => (
-  <article className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5 shadow-sm hover:shadow-md transition">
-    <div className="flex flex-wrap items-center gap-2 mb-2">
-      {day && <Badge>{day}</Badge>}
-      {time && <Badge>{time}</Badge>}
-    </div>
+/** Format helpers */
+const fmtMonthDay = (isoOrYmd) => {
+  try {
+    // Handle both full ISO and "YYYY-MM-DD"
+    const val =
+      isoOrYmd && isoOrYmd.length === 10
+        ? `${isoOrYmd}T00:00:00`
+        : isoOrYmd;
+    const d = new Date(val);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return isoOrYmd;
+  }
+};
 
-    <h3 className="font-semibold text-lg text-[#0b1c33]">{title}</h3>
+/** ---------- Program card ---------- */
+const ProgramCard = ({ p, linked, onRegister, calDates = [] }) => {
+  const occs = p.occurrences || [];
 
-    {facilitator && (
-      <p className="text-sm text-gray-500 mb-2">with {facilitator}</p>
-    )}
+  const hasCalDates = calDates && calDates.length > 0;
+  const showCalDates = hasCalDates ? calDates.slice(0, 4) : [];
+  const showOccs = !hasCalDates ? occs.slice(0, 4) : [];
 
-    <p className="text-gray-700 text-[15px] leading-relaxed">
-      {summary?.split("||")[0]}
-      {summary?.includes("||") && (
-        <span className="block font-semibold mt-1">
-          {summary.split("||")[1]}
-        </span>
+  const moreCount = hasCalDates
+    ? calDates.length - showCalDates.length
+    : occs.length - showOccs.length;
+
+  return (
+    <article className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5 shadow-sm hover:shadow-md transition">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        {p.day_label && <Badge>{p.day_label}</Badge>}
+        {p.time_label && <Badge>{p.time_label}</Badge>}
+      </div>
+
+      <h3 className="font-semibold text-lg text-[#0b1c33]">{p.title}</h3>
+
+      {p.instructor && (
+        <p className="text-sm text-gray-500 mb-2">with {p.instructor}</p>
       )}
-    </p>
 
-    {!linked ? (
-      <button
-        type="button"
-        disabled
-        className="mt-4 inline-block rounded-lg bg-gray-200 text-gray-600 px-4 py-2 text-sm font-semibold cursor-not-allowed"
-      >
-        Not yet open
-      </button>
-    ) : (
-      <button
-        type="button"
-        onClick={onRegister}
-        className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
-      >
-        Register here
-      </button>
-    )}
-  </article>
-);
+      <p className="text-gray-700 text-[15px] leading-relaxed">
+        {p.description?.split("||")[0]}
+        {p.description?.includes("||") && (
+          <span className="block font-semibold mt-1">
+            {p.description.split("||")[1]}
+          </span>
+        )}
+      </p>
 
-const FacilitatorCard = ({ name, img = "/images/facilitators/placeholder.jpg" }) => {
+      {/* date pills – now driven by Cal slots, fallback to occurrences */}
+      {(hasCalDates || occs.length > 0) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {hasCalDates
+            ? showCalDates.map((d) => (
+                <Pill key={d}>{fmtMonthDay(d)}</Pill>
+              ))
+            : showOccs.map((o) => (
+                <Pill key={o.id}>{fmtMonthDay(o.starts_at)}</Pill>
+              ))}
+          {moreCount > 0 && <Pill>+ {moreCount} more</Pill>}
+        </div>
+      )}
+
+      {!linked ? (
+        <button
+          type="button"
+          disabled
+          className="mt-4 inline-block rounded-lg bg-gray-200 text-gray-600 px-4 py-2 text-sm font-semibold cursor-not-allowed"
+        >
+          Not yet open
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onRegister(p)}
+          className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
+        >
+          Register here
+        </button>
+      )}
+    </article>
+  );
+};
+
+/** ---------- Facilitator card ---------- */
+const FacilitatorCard = ({
+  name,
+  img = "/images/facilitators/placeholder.jpg",
+}) => {
   return (
     <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
       <div className="aspect-[1/1] w-full bg-gray-100">
@@ -87,6 +142,7 @@ const FacilitatorCard = ({ name, img = "/images/facilitators/placeholder.jpg" })
   );
 };
 
+/** ---------- FAQ ---------- */
 const FAQItem = ({ q, a }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -116,16 +172,19 @@ const FAQItem = ({ q, a }) => {
   );
 };
 
-/** Cal booking modal */
+/** ---------- Cal booking modal (iframe only) ---------- */
 const CalBookingModal = ({ open, onClose, calUser, calSlug, name, email }) => {
   if (!open || !calUser || !calSlug) return null;
+
+  const user = String(calUser).trim();
+  const slug = String(calSlug).trim();
 
   const params = new URLSearchParams();
   params.set("embed", "1");
   if (name) params.set("name", name);
   if (email) params.set("email", email);
 
-  const src = `https://cal.com/${calUser}/${calSlug}?${params.toString()}`;
+  const src = `https://app.cal.com/${user}/${slug}?${params.toString()}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
@@ -207,9 +266,12 @@ export default function SupportGroups() {
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [programsError, setProgramsError] = useState(null);
 
-  // modal state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState(null);
+
+  // NEW: map of Cal dates/slots by program id
+  const [slotDatesByProgram, setSlotDatesByProgram] = useState({});
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -224,10 +286,27 @@ export default function SupportGroups() {
   const fetchSupportGroups = async () => {
     try {
       setLoadingPrograms(true);
-      const res = await fetch("/api/programs/support-groups");
+
+      const res = await fetch(`${API_BASE}/api/programs/support-groups`);
       if (!res.ok) throw new Error("Failed to fetch support groups");
-      const data = await res.json();
-      setPrograms(data);
+      const basePrograms = await res.json();
+
+      const withOccs = await Promise.all(
+        basePrograms.map(async (p) => {
+          try {
+            const oRes = await fetch(
+              `${API_BASE}/api/programs/${p.id}/occurrences`
+            );
+            if (!oRes.ok) return { ...p, occurrences: [] };
+            const occs = await oRes.json();
+            return { ...p, occurrences: occs };
+          } catch {
+            return { ...p, occurrences: [] };
+          }
+        })
+      );
+
+      setPrograms(withOccs);
       setProgramsError(null);
     } catch (e) {
       console.error(e);
@@ -241,6 +320,60 @@ export default function SupportGroups() {
     fetchSupportGroups();
   }, []);
 
+  // NEW: whenever programs change, fetch Cal slots for each
+  useEffect(() => {
+    if (!programs || programs.length === 0) return;
+
+    let cancelled = false;
+
+    async function loadSlots() {
+      setSlotsLoading(true);
+      try {
+        const results = await Promise.all(
+          programs.map(async (p) => {
+            // only bother if program is linked to Cal
+            if (!p.cal_event_type_id) {
+              return [p.id, { dates: [], slots: [] }];
+            }
+
+            try {
+              const res = await fetch(
+                `${API_BASE}/api/cal/programs/${p.id}/slots`
+              );
+              if (!res.ok) {
+                console.error("Failed slots res for program", p.id, res.status);
+                return [p.id, { dates: [], slots: [] }];
+              }
+              const data = await res.json();
+              const dates = data?.dates || [];
+              const slots = data?.slots || [];
+              return [p.id, { dates, slots }];
+            } catch (err) {
+              console.error("slots fetch failed for program", p.id, err);
+              return [p.id, { dates: [], slots: [] }];
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        const map = {};
+        for (const [id, info] of results) {
+          map[id] = info;
+        }
+        setSlotDatesByProgram(map);
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
+      }
+    }
+
+    loadSlots();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [programs]);
+
   const leftPrograms = useMemo(
     () => programs.filter((p) => p.column_index === 1),
     [programs]
@@ -250,11 +383,18 @@ export default function SupportGroups() {
     [programs]
   );
 
+  // Open booking modal – Cal handles availability/date itself
   const openBookingFor = (p) => {
-    const linked = !!(p?.cal_user && p?.cal_slug);
+    const linked = !!(p?.cal_user && p?.cal_slug && p?.cal_event_type_id);
     if (!linked) return;
+
     setSelectedProgram(p);
     setIsBookingOpen(true);
+  };
+
+  const closeBooking = () => {
+    setIsBookingOpen(false);
+    setSelectedProgram(null);
   };
 
   return (
@@ -359,47 +499,64 @@ export default function SupportGroups() {
         )}
 
         {!loadingPrograms && !programsError && (
-          <div className="grid md:grid-cols-2 gap-6 mt-6">
-            <div className="space-y-4">
-              {leftPrograms.map((p) => {
-                const linked = !!(p.cal_user && p.cal_slug);
-                return (
-                  <ProgramCard
-                    key={p.id}
-                    title={p.title}
-                    facilitator={p.instructor}
-                    day={p.day_label}
-                    time={p.time_label}
-                    summary={p.description}
-                    linked={linked}
-                    onRegister={() => openBookingFor(p)}
-                  />
-                );
-              })}
-            </div>
+          <>
+            {slotsLoading && (
+              <p className="mt-2 text-xs text-gray-400">
+                Updating dates from Cal…
+              </p>
+            )}
 
-            <div className="space-y-4">
-              {rightPrograms.map((p) => {
-                const linked = !!(p.cal_user && p.cal_slug);
-                return (
-                  <ProgramCard
-                    key={p.id}
-                    title={p.title}
-                    facilitator={p.instructor}
-                    day={p.day_label}
-                    time={p.time_label}
-                    summary={p.description}
-                    linked={linked}
-                    onRegister={() => openBookingFor(p)}
-                  />
-                );
-              })}
+            <div className="grid md:grid-cols-2 gap-6 mt-6">
+              <div className="space-y-4">
+                {leftPrograms.map((p) => {
+                  const linked = !!(
+                    p.cal_user &&
+                    p.cal_slug &&
+                    p.cal_event_type_id
+                  );
+                  const calInfo = slotDatesByProgram[p.id] || {
+                    dates: [],
+                    slots: [],
+                  };
+                  return (
+                    <ProgramCard
+                      key={p.id}
+                      p={p}
+                      linked={linked}
+                      onRegister={openBookingFor}
+                      calDates={calInfo.dates}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="space-y-4">
+                {rightPrograms.map((p) => {
+                  const linked = !!(
+                    p.cal_user &&
+                    p.cal_slug &&
+                    p.cal_event_type_id
+                  );
+                  const calInfo = slotDatesByProgram[p.id] || {
+                    dates: [],
+                    slots: [],
+                  };
+                  return (
+                    <ProgramCard
+                      key={p.id}
+                      p={p}
+                      linked={linked}
+                      onRegister={openBookingFor}
+                      calDates={calInfo.dates}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* Optional manual refresh button for sanity */}
-        <div className="mt-6">
+        <div className="mt-6 flex gap-2">
           <button
             type="button"
             onClick={fetchSupportGroups}
@@ -504,13 +661,13 @@ export default function SupportGroups() {
         </div>
       </section>
 
-      {/* Booking modal */}
+      {/* booking modal */}
       <CalBookingModal
         open={isBookingOpen}
-        onClose={() => setIsBookingOpen(false)}
+        onClose={closeBooking}
         calUser={selectedProgram?.cal_user}
         calSlug={selectedProgram?.cal_slug}
-        name={loggedInUser?.fullName}
+        name={loggedInUser?.name}
         email={loggedInUser?.email}
       />
     </div>
