@@ -1,7 +1,6 @@
-// src/app/App.js (or wherever this lives)
+// src/app/App.js
 import { useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import axios from "axios";
 
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
@@ -64,15 +63,13 @@ import MyOrders from "../features/user/pages/MyOrders";
 import PastSessions from "../features/user/pages/PastSessions";
 import Support from "../components/Pages/Support/UsersSupport";
 
-const CAL_BOOKING_ENDPOINT = "/api/cal/bookings/from-embed";
-
 export default function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   const [loggedInUser, setLoggedInUser] = useState(null);
 
-  // Load logged-in user once (for name/email/userId on bookings)
+  // Load logged-in user once (for dashboards etc.)
   useEffect(() => {
     try {
       const raw = localStorage.getItem("hsUser");
@@ -83,76 +80,6 @@ export default function App() {
       console.error("Failed to parse hsUser from localStorage:", err);
     }
   }, []);
-
-  // Global Cal embed loader + bookingSuccessful listener
-  useEffect(() => {
-    // Load Cal script once
-    let script = document.querySelector('script[src="https://cal.com/embed.js"]');
-    if (!script) {
-      script = document.createElement("script");
-      script.src = "https://cal.com/embed.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-
-    let registered = false;
-
-    const tryRegister = () => {
-      if (registered) return;
-      if (!window.Cal || typeof window.Cal !== "function") return;
-
-      registered = true;
-
-      window.Cal("on", {
-        action: "bookingSuccessful",
-        callback: async (event) => {
-          try {
-            const detail = event?.detail?.data || event?.detail || {};
-            const programId = window.__hsCalProgramId;
-
-            if (!programId) {
-              console.warn(
-                "[Cal bookingSuccessful] __hsCalProgramId missing; not saving booking."
-              );
-              return;
-            }
-
-            const payload = {
-              programId,
-              calBookingId: detail.bookingId || detail.id || null,
-              date: detail.date || detail.startTime || detail.start_time || null,
-              durationMinutes:
-                detail.duration ||
-                detail.length ||
-                detail.lengthInMinutes ||
-                null,
-              attendeeName:
-                detail.name ||
-                detail.attendeeName ||
-                loggedInUser?.name ||
-                null,
-              attendeeEmail:
-                detail.email ||
-                detail.attendeeEmail ||
-                loggedInUser?.email ||
-                null,
-              userId: loggedInUser?.id || null,
-            };
-
-            await axios.post(CAL_BOOKING_ENDPOINT, payload);
-          } catch (err) {
-            console.error("Failed to persist Cal booking:", err);
-          }
-        },
-      });
-    };
-
-    const intervalId = setInterval(tryRegister, 400);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [loggedInUser]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -276,42 +203,57 @@ export default function App() {
           <Route path="/support" element={<Support />} />
 
           {/* ===== ADMIN ROUTES ===== */}
-          <Route path="/admin/dashboard" element={ <ProtectedRoute role="admin">
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute role="admin">
                 <AdminDashboard />
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/users" element={
+          <Route
+            path="/admin/users"
+            element={
               <ProtectedRoute role="admin">
                 <UsersPage />
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/add-programs" element={
+          <Route
+            path="/admin/add-programs"
+            element={
               <ProtectedRoute role="admin">
                 <ProgramManagement />
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/activeprogram" element={
+          <Route
+            path="/admin/activeprogram"
+            element={
               <ProtectedRoute role="admin">
                 <ActiveProgramsPage />
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/EventCalendar" element={
+          <Route
+            path="/admin/EventCalendar"
+            element={
               <ProtectedRoute role="admin">
                 <AdminEventCalendar />
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/settings" element={
+          <Route
+            path="/admin/settings"
+            element={
               <ProtectedRoute role="admin">
                 <AdminSettings />
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/announcements" element={
+          <Route
+            path="/admin/announcements"
+            element={
               <ProtectedRoute role="admin">
                 <Announcements />
               </ProtectedRoute>
@@ -319,25 +261,33 @@ export default function App() {
           />
 
           {/* ===== User ROUTES ===== */}
-          <Route path="/user/dashboard" element={
+          <Route
+            path="/user/dashboard"
+            element={
               <ProtectedRoute role="member">
                 <UserDashboard />
               </ProtectedRoute>
             }
           />
-          <Route path="/user/profile" element={
+          <Route
+            path="/user/profile"
+            element={
               <ProtectedRoute role="member">
                 <Profile />
               </ProtectedRoute>
             }
           />
-          <Route path="/user/past-sessions" element={
+          <Route
+            path="/user/past-sessions"
+            element={
               <ProtectedRoute role="member">
                 <PastSessions />
               </ProtectedRoute>
             }
           />
-          <Route path="/user/orders" element={
+          <Route
+            path="/user/orders"
+            element={
               <ProtectedRoute role="member">
                 <MyOrders />
               </ProtectedRoute>

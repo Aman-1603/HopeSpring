@@ -13,6 +13,7 @@ import userRoutes from "../backend/routes/userRoutes.js";
 import calendarEventRoutes from "../backend/routes/calendarEvents.js";
 import donateRoutes from "../backend/routes/donateRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import calWebhookRoutes from "./routes/calWebhookRoutes.js";
 
 dotenv.config();
 
@@ -30,6 +31,14 @@ app.use(
   })
 );
 
+// 🔔 Cal webhook: use raw JSON body for signature + payload parsing
+app.use(
+  "/api/cal/webhook",
+  express.raw({ type: "application/json" }),
+  calWebhookRoutes
+);
+
+// Normal JSON parser for everything else
 app.use(express.json());
 
 /* 🔍 Global request logger */
@@ -85,18 +94,13 @@ app.post("/api/register", async (req, res) => {
 });
 
 // user section admin
-
 app.use("/api/users", userRoutes);
 
 // for calendar-event section
-
 app.use("/api/calendar-events", calendarEventRoutes);
 
-// for strip payment for the donation section
-
+// for stripe payment for the donation section
 app.use("/api/donate", donateRoutes);
-
-
 
 // LOGIN
 app.post("/api/login", async (req, res) => {
@@ -217,8 +221,7 @@ app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
 app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/bookings", bookingRoutes);
-app.use("/api/cal", calRoutes); 
-app.use("/api/bookings", bookingRoutes);
+app.use("/api/cal", calRoutes);
 
 /* ------------------------------------------
    Start Server

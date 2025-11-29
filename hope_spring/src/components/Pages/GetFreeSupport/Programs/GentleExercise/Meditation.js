@@ -3,13 +3,12 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 
-// simple category normalizer (same idea as admin page)
 const normalize = (v) =>
   (v || "").trim().toLowerCase().replace(/\s+/g, "_");
 
 const API_BASE = "/api/programs";
 
-/* -------------------- small UI atoms -------------------- */
+/* ----- UI atoms (same as Yoga) ----- */
 const Pill = ({ children }) => (
   <span className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-3 py-1 text-white/90 backdrop-blur">
     {children}
@@ -83,7 +82,7 @@ const Accordion = ({ items, defaultOpen = 0 }) => (
   </div>
 );
 
-/* -------------------- static page copy -------------------- */
+/* ----- static content ----- */
 const benefits = [
   {
     title: "Enhanced Emotional Resilience",
@@ -177,7 +176,64 @@ const related = [
   },
 ];
 
-/* -------------------- main page -------------------- */
+/* ----- Cal booking modal (with metadata[userId]) ----- */
+const CalBookingModal = ({
+  open,
+  onClose,
+  calUser,
+  calSlug,
+  name,
+  email,
+  userId,
+}) => {
+  if (!open || !calUser || !calSlug) return null;
+
+  const user = String(calUser).trim();
+  const slug = String(calSlug).trim();
+
+  const params = new URLSearchParams();
+  params.set("embed", "1");
+  if (name) params.set("name", name);
+  if (email) params.set("email", email);
+
+  // Important: pass HopeSpring user id into Cal metadata for webhook
+  if (userId) {
+    params.set("metadata[userId]", String(userId));
+  }
+
+  const src = `https://app.cal.com/${user}/${slug}?${params.toString()}`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+      <div className="relative w-[95vw] h-[95vh] bg-white rounded-2xl overflow-hidden shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 inline-flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm w-10 h-10 hover:bg-slate-50"
+          aria-label="Close booking"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-700">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        <iframe
+          title="Book a meditation session"
+          src={src}
+          className="w-full h-full border-0"
+          loading="lazy"
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ----- main component ----- */
 export default function MeditationProgramPage() {
   const [loggedInUser, setLoggedInUser] = useState(null);
 
@@ -185,7 +241,10 @@ export default function MeditationProgramPage() {
   const [loading, setLoading] = useState(true);
   const [programsError, setProgramsError] = useState(null);
 
-  // load logged-in user (for prefill)
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState(null);
+
+  // load logged-in user
   useEffect(() => {
     try {
       const raw = localStorage.getItem("hsUser");
@@ -196,7 +255,7 @@ export default function MeditationProgramPage() {
     }
   }, []);
 
-  // fetch all programs then filter client-side
+  // fetch programs
   useEffect(() => {
     const load = async () => {
       try {
@@ -219,6 +278,18 @@ export default function MeditationProgramPage() {
     const sub = normalize(p.subcategory);
     return cat === "gentle_exercise" && (sub === "meditation" || !sub);
   });
+
+  const openBookingFor = (p) => {
+    const linked = !!(p?.cal_user && p?.cal_slug && p?.cal_event_type_id);
+    if (!linked) return;
+    setSelectedProgram(p);
+    setIsBookingOpen(true);
+  };
+
+  const closeBooking = () => {
+    setIsBookingOpen(false);
+    setSelectedProgram(null);
+  };
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
@@ -247,9 +318,8 @@ export default function MeditationProgramPage() {
               exercising control over thoughts and emotions.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              {/* scroll to dynamic list section */}
               <Button to="#register" variant="primary">
-                View & register
+                View &amp; register
               </Button>
               <Button as={Link} to="/programs" variant="ghost">
                 Explore other programs
@@ -351,75 +421,38 @@ export default function MeditationProgramPage() {
               </p>
             ) : (
               <Accordion
-                items={meditationPrograms.map((p) => {
-                  const linked = !!(
-                    p.cal_user &&
-                    p.cal_slug &&
-                    p.cal_event_type_id
-                  );
-
-                  const calPath = linked
-                    ? `${p.cal_user}/${p.cal_slug}`
-                    : null;
-
-                  const config = {
-                    layout: "popup",
-                  };
-                  if (loggedInUser?.name) config.name = loggedInUser.name;
-                  if (loggedInUser?.email) config.email = loggedInUser.email;
-
-                  return {
-                    title: p.title,
-                    icon: <span className="text-emerald-600">●</span>,
-                    content: () => (
-                      <div className="space-y-3 text-gray-700">
-                        {p.instructor && (
-                          <p className="text-sm font-medium text-gray-900">
-                            Facilitator: {p.instructor}
-                          </p>
-                        )}
-                        {p.location && (
-                          <p className="text-sm text-gray-600">
-                            Location: {p.location}
-                          </p>
-                        )}
-                        {p.description && <p>{p.description}</p>}
-                        {linked ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // mark which program this booking belongs to
-                              window.__hsCalProgramId = p.id;
-
-                              // prefer explicit open if Cal is ready
-                              if (window.Cal) {
-                                window.Cal("open", {
-                                  calLink: calPath,
-                                  config,
-                                });
-                              } else {
-                                // fallback: let data-cal-link handler or plain link handle it
-                                window.open(
-                                  `https://cal.com/${calPath}`,
-                                  "_blank"
-                                );
-                              }
-                            }}
-                            data-cal-link={calPath}
-                            data-cal-config={JSON.stringify(config)}
-                            className="mt-1 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold border border-gray-300 text-gray-900 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-700"
-                          >
-                            Register
-                          </button>
-                        ) : (
-                          <p className="text-xs text-gray-500">
-                            Registration link coming soon.
-                          </p>
-                        )}
-                      </div>
-                    ),
-                  };
-                })}
+                items={meditationPrograms.map((p) => ({
+                  title: p.title,
+                  icon: <span className="text-emerald-600">●</span>,
+                  content: () => (
+                    <div className="space-y-3 text-gray-700">
+                      {p.instructor && (
+                        <p className="text-sm font-medium text-gray-900">
+                          Facilitator: {p.instructor}
+                        </p>
+                      )}
+                      {p.location && (
+                        <p className="text-sm text-gray-600">
+                          Location: {p.location}
+                        </p>
+                      )}
+                      {p.description && <p>{p.description}</p>}
+                      {p.cal_user && p.cal_slug && p.cal_event_type_id ? (
+                        <button
+                          type="button"
+                          onClick={() => openBookingFor(p)}
+                          className="mt-1 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold border border-gray-300 text-gray-900 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-700"
+                        >
+                          Register
+                        </button>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          Registration link coming soon.
+                        </p>
+                      )}
+                    </div>
+                  ),
+                }))}
                 defaultOpen={0}
               />
             )}
@@ -442,7 +475,7 @@ export default function MeditationProgramPage() {
         </div>
       </section>
 
-      {/* FAQ placeholder + image */}
+      {/* FAQ + image */}
       <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
         <img
           src="/images/faq-med.webp"
@@ -507,6 +540,17 @@ export default function MeditationProgramPage() {
       </section>
 
       <footer className="px-4 py-0 text-center text-xs text-gray-500"></footer>
+
+      {/* Booking modal */}
+      <CalBookingModal
+        open={isBookingOpen}
+        onClose={closeBooking}
+        calUser={selectedProgram?.cal_user}
+        calSlug={selectedProgram?.cal_slug}
+        name={loggedInUser?.name}
+        email={loggedInUser?.email}
+        userId={loggedInUser?.id}
+      />
     </main>
   );
 }
