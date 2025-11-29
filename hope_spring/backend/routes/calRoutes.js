@@ -435,6 +435,89 @@ router.get("/programs/:id/slots", async (req, res) => {
 });
 
 /* -------------------------------
+   Save booking from Cal embed → DB
+   POST /api/cal/bookings/from-embed
+-------------------------------- */
+router.post("/bookings/from-embed", async (req, res) => {
+  try {
+    const {
+      programId,
+      userId,
+      calBookingId,
+      date,
+      durationMinutes,
+      attendeeName,
+      attendeeEmail,
+      status,
+    } = req.body || {};
+
+    if (!programId || !date) {
+      return res
+        .status(400)
+        .json({ error: "programId and date are required" });
+    }
+
+    const start = new Date(date);
+    if (Number.isNaN(start.getTime())) {
+      return res.status(400).json({ error: "Invalid date" });
+    }
+
+    let end = null;
+    const dur = Number(durationMinutes);
+    if (dur && Number.isFinite(dur) && dur > 0) {
+      end = new Date(start.getTime() + dur * 60 * 1000);
+    }
+
+    const insertRes = await pool.query(
+      `
+      INSERT INTO bookings
+        (program_id,
+         user_id,
+         cal_booking_id,
+         attendee_name,
+         attendee_email,
+         status,
+         event_start,
+         event_end,
+         created_at)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      ON CONFLICT (cal_booking_id)
+      DO UPDATE SET
+        program_id     = EXCLUDED.program_id,
+        user_id        = EXCLUDED.user_id,
+        attendee_name  = EXCLUDED.attendee_name,
+        attendee_email = EXCLUDED.attendee_email,
+        status         = EXCLUDED.status,
+        event_start    = EXCLUDED.event_start,
+        event_end      = EXCLUDED.event_end
+      RETURNING *
+      `,
+      [
+        Number(programId),
+        userId ? Number(userId) : null,
+        calBookingId || null,
+        attendeeName || null,
+        attendeeEmail || null,
+        status || "booked",
+        start.toISOString(),
+        end ? end.toISOString() : null,
+      ]
+    );
+
+    return res.status(201).json({
+      ok: true,
+      booking: insertRes.rows[0],
+    });
+  } catch (err) {
+    console.error("❌ Error saving Cal booking to DB:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to save booking to database" });
+  }
+});
+
+/* -------------------------------
    Linking routes
 -------------------------------- */
 

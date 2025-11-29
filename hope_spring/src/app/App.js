@@ -1,4 +1,8 @@
+// src/app/App.js (or wherever this lives)
+import { useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
+import axios from "axios";
+
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Newsletter from "../components/shared/Newsletter";
@@ -49,30 +53,109 @@ import UsersPage from "../features/admin/pages/UsersPage";
 import ProgramManagement from "../features/admin/pages/AddProgram";
 import ActiveProgramsPage from "../features/admin/pages/ActiveProgramsPage";
 import AdminEventCalendar from "../features/admin/pages/AdminEventCalendar";
-
 import AdminSettings from "../features/admin/pages/AdminSettings";
 import Announcements from "../features/admin/pages/Announcements";
 import DonateSuccess from "../components/Pages/DonateSuccess";
 
-//User Section
+// User Section
 import UserDashboard from "../features/user/pages/UserDashboard";
 import Profile from "../features/user/pages/Profile";
 import MyOrders from "../features/user/pages/MyOrders";
 import PastSessions from "../features/user/pages/PastSessions";
-import Support from "../components/Pages/Support/UsersSupport"
+import Support from "../components/Pages/Support/UsersSupport";
 
-
-
+const CAL_BOOKING_ENDPOINT = "/api/cal/bookings/from-embed";
 
 export default function App() {
   const location = useLocation();
-
-  // ✅ Detect if current route is admin
   const isAdminRoute = location.pathname.startsWith("/admin");
+
+  const [loggedInUser, setLoggedInUser] = useState(null);
+
+  // Load logged-in user once (for name/email/userId on bookings)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("hsUser");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      setLoggedInUser(parsed);
+    } catch (err) {
+      console.error("Failed to parse hsUser from localStorage:", err);
+    }
+  }, []);
+
+  // Global Cal embed loader + bookingSuccessful listener
+  useEffect(() => {
+    // Load Cal script once
+    let script = document.querySelector('script[src="https://cal.com/embed.js"]');
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://cal.com/embed.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    let registered = false;
+
+    const tryRegister = () => {
+      if (registered) return;
+      if (!window.Cal || typeof window.Cal !== "function") return;
+
+      registered = true;
+
+      window.Cal("on", {
+        action: "bookingSuccessful",
+        callback: async (event) => {
+          try {
+            const detail = event?.detail?.data || event?.detail || {};
+            const programId = window.__hsCalProgramId;
+
+            if (!programId) {
+              console.warn(
+                "[Cal bookingSuccessful] __hsCalProgramId missing; not saving booking."
+              );
+              return;
+            }
+
+            const payload = {
+              programId,
+              calBookingId: detail.bookingId || detail.id || null,
+              date: detail.date || detail.startTime || detail.start_time || null,
+              durationMinutes:
+                detail.duration ||
+                detail.length ||
+                detail.lengthInMinutes ||
+                null,
+              attendeeName:
+                detail.name ||
+                detail.attendeeName ||
+                loggedInUser?.name ||
+                null,
+              attendeeEmail:
+                detail.email ||
+                detail.attendeeEmail ||
+                loggedInUser?.email ||
+                null,
+              userId: loggedInUser?.id || null,
+            };
+
+            await axios.post(CAL_BOOKING_ENDPOINT, payload);
+          } catch (err) {
+            console.error("Failed to persist Cal booking:", err);
+          }
+        },
+      });
+    };
+
+    const intervalId = setInterval(tryRegister, 400);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [loggedInUser]);
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Show Header only on non-admin pages */}
       {!isAdminRoute && <Header />}
 
       <main className="flex-1">
@@ -81,36 +164,97 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/register" element={<Register />} />
 
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/bookprogram" element={<Book_Program />} />
           <Route path="/programs" element={<Programs />} />
 
           {/* Get Started */}
-          <Route path="/get-started/living-with-cancer" element={<LivingWithCancer />} />
-          <Route path="/get-started/caregiver-family" element={<CaregiverFamily />} />
-          <Route path="/get-started/provider-partner" element={<ProviderPartner />} />
-          <Route path="/get-started/give-or-volunteer" element={<GiveOrVolunteer />} />
+          <Route
+            path="/get-started/living-with-cancer"
+            element={<LivingWithCancer />}
+          />
+          <Route
+            path="/get-started/caregiver-family"
+            element={<CaregiverFamily />}
+          />
+          <Route
+            path="/get-started/provider-partner"
+            element={<ProviderPartner />}
+          />
+          <Route
+            path="/get-started/give-or-volunteer"
+            element={<GiveOrVolunteer />}
+          />
 
           {/* Get Free Support */}
-          <Route path="/support/calendar" element={<Page title="View Calendar & Register" />} />
+          <Route
+            path="/support/calendar"
+            element={<Page title="View Calendar & Register" />}
+          />
           <Route path="/support/programs" element={<Page title="Programs" />} />
-          <Route path="/support/programs/support-groups" element={<SupportGroups />} />
-          <Route path="/support/programs/gentle-exercise/meditation" element={<MeditationProgramPage />} />
-          <Route path="/support/programs/gentle-exercise/yoga" element={<YogaProgramPage />} />
-          <Route path="/support/programs/gentle-exercise/tai-chi" element={<TaiChiProgramPage />} />
-          <Route path="/support/programs/gentle-exercise/qi-gong" element={<QiGongProgramPage />} />
-          <Route path="/support/programs/children-youth-families" element={<ChildrenYouthFamilyPage />} />
-          <Route path="/support/programs/coping/chemo-brain" element={<ChemoBrainProgramPage />} />
-          <Route path="/support/programs/arts-creativity/joyful-art-practice" element={<JoyfulArtPracticePage />} />
-          <Route path="/support/programs/arts-creativity/joyful-art-skills" element={<JoyfulArtSkillsTechniquesPage />} />
-          <Route path="/support/programs/relaxation/massage-therapy" element={<MassageTherapy />} />
-          <Route path="/support/programs/relaxation/therapeutic-touch" element={<TherapeuticTouch />} />
-          <Route path="/support/programs/relaxation/reiki" element={<Reiki />} />
+          <Route
+            path="/support/programs/support-groups"
+            element={<SupportGroups />}
+          />
+          <Route
+            path="/support/programs/gentle-exercise/meditation"
+            element={<MeditationProgramPage />}
+          />
+          <Route
+            path="/support/programs/gentle-exercise/yoga"
+            element={<YogaProgramPage />}
+          />
+          <Route
+            path="/support/programs/gentle-exercise/tai-chi"
+            element={<TaiChiProgramPage />}
+          />
+          <Route
+            path="/support/programs/gentle-exercise/qi-gong"
+            element={<QiGongProgramPage />}
+          />
+          <Route
+            path="/support/programs/children-youth-families"
+            element={<ChildrenYouthFamilyPage />}
+          />
+          <Route
+            path="/support/programs/coping/chemo-brain"
+            element={<ChemoBrainProgramPage />}
+          />
+          <Route
+            path="/support/programs/arts-creativity/joyful-art-practice"
+            element={<JoyfulArtPracticePage />}
+          />
+          <Route
+            path="/support/programs/arts-creativity/joyful-art-skills"
+            element={<JoyfulArtSkillsTechniquesPage />}
+          />
+          <Route
+            path="/support/programs/relaxation/massage-therapy"
+            element={<MassageTherapy />}
+          />
+          <Route
+            path="/support/programs/relaxation/therapeutic-touch"
+            element={<TherapeuticTouch />}
+          />
+          <Route
+            path="/support/programs/relaxation/reiki"
+            element={<Reiki />}
+          />
           <Route path="/resources" element={<Resources />} />
 
           {/* Book a Service */}
-          <Route path="/book/cancer-care-counselling" element={<CancerCareCounselling />} />
+          <Route
+            path="/book/cancer-care-counselling"
+            element={<CancerCareCounselling />}
+          />
 
           {/* Get Involved */}
           <Route path="/donate" element={<Donate />} />
@@ -131,33 +275,91 @@ export default function App() {
           {/* Users Support */}
           <Route path="/support" element={<Support />} />
 
-
-
           {/* ===== ADMIN ROUTES ===== */}
-          
-          <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/users" element={<ProtectedRoute role="admin"><UsersPage /></ProtectedRoute>} />
-          <Route path="/admin/add-programs" element={<ProtectedRoute role="admin"><ProgramManagement /></ProtectedRoute>} />
-          <Route path="/admin/activeprogram" element={<ProtectedRoute role="admin"><ActiveProgramsPage /></ProtectedRoute>} />
-          <Route path="/admin/EventCalendar" element={<ProtectedRoute role="admin"><AdminEventCalendar /></ProtectedRoute>} />
-          <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminSettings/></ProtectedRoute>} />
-          <Route path="/admin/announcements" element={<ProtectedRoute role="admin"><Announcements/></ProtectedRoute>} />         
-                {/* ===== User ROUTES ===== */}
-                
-          <Route path="/user/dashboard" element={<ProtectedRoute role="member"><UserDashboard /></ProtectedRoute>} />
-          <Route path="/user/profile" element={<ProtectedRoute role="member"><Profile /></ProtectedRoute>} />
-          <Route path="/user/past-sessions" element={<ProtectedRoute role="member"><PastSessions /></ProtectedRoute>} />
-          <Route path="/user/orders" element={<ProtectedRoute role="member"><MyOrders /></ProtectedRoute>} />
+          <Route path="/admin/dashboard" element={ <ProtectedRoute role="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/users" element={
+              <ProtectedRoute role="admin">
+                <UsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/add-programs" element={
+              <ProtectedRoute role="admin">
+                <ProgramManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/activeprogram" element={
+              <ProtectedRoute role="admin">
+                <ActiveProgramsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/EventCalendar" element={
+              <ProtectedRoute role="admin">
+                <AdminEventCalendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/settings" element={
+              <ProtectedRoute role="admin">
+                <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/announcements" element={
+              <ProtectedRoute role="admin">
+                <Announcements />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* For payment sucess page */}
+          {/* ===== User ROUTES ===== */}
+          <Route path="/user/dashboard" element={
+              <ProtectedRoute role="member">
+                <UserDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/user/profile" element={
+              <ProtectedRoute role="member">
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/user/past-sessions" element={
+              <ProtectedRoute role="member">
+                <PastSessions />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/user/orders" element={
+              <ProtectedRoute role="member">
+                <MyOrders />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* For payment success page */}
           <Route path="/donate/success" element={<DonateSuccess />} />
 
           {/* 404 */}
-          <Route path="*" element={<Page title="Page Not Found" intro="Sorry, we couldn’t find that page." />} />
+          <Route
+            path="*"
+            element={
+              <Page
+                title="Page Not Found"
+                intro="Sorry, we couldn’t find that page."
+              />
+            }
+          />
         </Routes>
       </main>
 
-      {/* Show Footer only on non-admin pages */}
       {!isAdminRoute && (
         <>
           <Newsletter />
