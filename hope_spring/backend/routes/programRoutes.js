@@ -1,4 +1,4 @@
-// hope_spring/backend/routes/programRoutes.js
+// backend/routes/programRoutes.js
 import express from "express";
 import { pool } from "../db.js";
 
@@ -91,7 +91,8 @@ router.get("/", async (req, res) => {
         p.cal_user,
         p.cal_schedule_id,
         p.duration_minutes,
-        p.zoom_link
+        p.zoom_link,
+        p.subcategory              -- 👈 NEW
       FROM programs p
       LEFT JOIN (
         SELECT
@@ -131,6 +132,8 @@ router.get("/support-groups", async (req, res) => {
         p.cal_user,
         p.cal_schedule_id,
         p.zoom_link,
+        p.duration_minutes,
+        p.subcategory,             -- 👈 NEW (not strictly needed but nice)
         COALESCE(b.count_accepted, 0) AS participants
       FROM programs p
       LEFT JOIN (
@@ -273,6 +276,9 @@ router.post("/", async (req, res) => {
       cal_schedule_id,
       cal_slug,
       cal_user,
+
+      // NEW
+      subcategory,
     } = req.body;
 
     const baseDate = date ? String(date).slice(0, 10) : null;
@@ -288,14 +294,14 @@ router.post("/", async (req, res) => {
         max_capacity, instructor, status,
         day_label, time_label, column_index, sort_order, is_active,
         cal_event_type_id, cal_schedule_id, cal_slug, cal_user,
-        duration_minutes, zoom_link
+        duration_minutes, zoom_link, subcategory
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,
         $7,$8,$9,
         $10,$11,$12,$13,$14,
         $15,$16,$17,$18,
-        $19,$20
+        $19,$20,$21
       )
       RETURNING *
       `,
@@ -320,6 +326,7 @@ router.post("/", async (req, res) => {
         cal_user ?? null,
         durationMinutes != null ? durationMinutes : null,
         zoomLink ?? null,
+        subcategory ?? null,
       ]
     );
 
@@ -402,6 +409,9 @@ router.put("/:id", async (req, res) => {
     if (req.body.zoomLink !== undefined) {
       merged.zoom_link = req.body.zoomLink;
     }
+    if (req.body.subcategory !== undefined) {
+      merged.subcategory = req.body.subcategory;
+    }
 
     const baseDate = merged.date ? String(merged.date).slice(0, 10) : null;
     const baseTime = merged.time ? String(merged.time).slice(0, 5) : null;
@@ -431,8 +441,8 @@ router.put("/:id", async (req, res) => {
         day_label=$10, time_label=$11, column_index=$12,
         sort_order=$13, is_active=$14,
         cal_event_type_id=$15, cal_schedule_id=$16, cal_slug=$17, cal_user=$18,
-        duration_minutes=$19, zoom_link=$20
-      WHERE id=$21
+        duration_minutes=$19, zoom_link=$20, subcategory=$21
+      WHERE id=$22
       RETURNING *
       `,
       [
@@ -456,6 +466,7 @@ router.put("/:id", async (req, res) => {
         finalCalUser ?? null,
         merged.duration_minutes ?? null,
         merged.zoom_link ?? null,
+        merged.subcategory ?? null,
         programId,
       ]
     );

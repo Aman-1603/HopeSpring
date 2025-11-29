@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import AdminLayout from "../AdminLayout";
-//import { CalendarDays, MapPin, Users, User, PlusCircle, Tag, Link2, CheckCircle2, Loader2 } from "lucide-react";
-// Use relative path for proxy
 import {
   CalendarDays,
   MapPin,
@@ -15,60 +13,53 @@ import {
   Link2,
   Pencil,
   Trash2,
+  Timer,
 } from "lucide-react";
 
 const API_BASE = "/api/programs";
 const CAL_BASE = "/api/cal";
 
-/* ---------------------- date helpers (no deps) ---------------------- */
-const pad2 = (n) => String(n).padStart(2, "0");
-const toYMD = (d) =>
-  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/** simple slugger used both in UI + save */
+const normalizeCategory = (v) =>
+  (v || "").trim().toLowerCase().replace(/\s+/g, "_");
 
-const getMonthMatrix = (year, monthIndex0) => {
-  const first = new Date(year, monthIndex0, 1);
-  const last = new Date(year, monthIndex0 + 1, 0);
-  const startWeekday = first.getDay();
-  const daysInMonth = last.getDate();
-
-  const cells = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(new Date(year, monthIndex0, d));
-  }
-  while (cells.length < 42) cells.push(null);
-
-  const rows = [];
-  for (let r = 0; r < 6; r++) rows.push(cells.slice(r * 7, r * 7 + 7));
-  return rows;
-};
-/* ------------------------------------------------------------------- */
+/** subcategories for Gentle Exercise */
+const GENTLE_EXERCISE_SUBCATS = ["Meditation", "Yoga", "Tai Chi", "Qi Gong"];
 
 const emptyForm = {
   id: null,
   title: "",
   description: "",
   category: "",
-  date: "",
-  time: "",
+  subcategory: "",
+
   location: "",
   maxCapacity: "",
   instructor: "",
   status: "upcoming",
 
-  // support group
+  // support group only
   day_label: "",
   time_label: "",
   column_index: 1,
   sort_order: 0,
   is_active: true,
 
-  // occurrences extras (date-only strings)
-  additionalDates: [],
-
-  // month picker cursor YYYY-MM
-  monthCursor: "",
+  // duration in minutes (maps to duration_minutes in DB)
+  durationMinutes: "",
 };
+
+function formatDuration(mins) {
+  const m = Number(mins);
+  if (!m || m <= 0) return null;
+  const hours = Math.floor(m / 60);
+  const minutes = m % 60;
+
+  if (hours && minutes)
+    return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} min`;
+  if (hours) return `${hours} hr${hours > 1 ? "s" : ""}`;
+  return `${minutes} min`;
+}
 
 export default function ProgramManagement() {
   const [programs, setPrograms] = useState([]);
@@ -110,49 +101,27 @@ export default function ProgramManagement() {
   /* --------------------------------------------------------------- */
 
   const openAdd = () => {
-    const now = new Date();
-    const ym = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
     setEditMode(false);
-    setFormData({ ...emptyForm, monthCursor: ym });
+    setFormData({ ...emptyForm });
     setShowProgramModal(true);
   };
 
   const openEdit = async (p) => {
     setEditMode(true);
 
-    let primaryDate = p.date || "";
-    let primaryTime = p.time || "";
-    let extras = [];
-
+    // still fetch occurrences for legacy/analytics, but not shown in form
     try {
-      const occRes = await axios.get(`${API_BASE}/${p.id}/occurrences`);
-      const occs = (occRes.data || []).sort(
-        (a, b) => new Date(a.starts_at) - new Date(b.starts_at)
-      );
-
-      if (occs.length) {
-        const first = new Date(occs[0].starts_at);
-        primaryDate = toYMD(first);
-        primaryTime = `${pad2(first.getHours())}:${pad2(
-          first.getMinutes()
-        )}`;
-      }
-      extras = occs.slice(1).map((o) => toYMD(new Date(o.starts_at)));
+      await axios.get(`${API_BASE}/${p.id}/occurrences`);
     } catch {
-      // fall back to programs table values
+      // ignore
     }
-
-    const monthCursor =
-      primaryDate?.slice(0, 7) ||
-      `${new Date().getFullYear()}-${pad2(new Date().getMonth() + 1)}`;
 
     setFormData({
       id: p.id,
       title: p.title || "",
       description: p.description || "",
       category: p.category || "",
-      date: primaryDate,
-      time: primaryTime,
+      subcategory: p.subcategory || "",
       location: p.location || "",
       maxCapacity: p.max_capacity ?? "",
       instructor: p.instructor || "",
@@ -164,8 +133,10 @@ export default function ProgramManagement() {
       sort_order: p.sort_order || 0,
       is_active: p.is_active ?? true,
 
-      additionalDates: extras,
-      monthCursor,
+      durationMinutes:
+        p.duration_minutes !== null && p.duration_minutes !== undefined
+          ? String(p.duration_minutes)
+          : "",
     });
 
     setShowProgramModal(true);
@@ -181,11 +152,19 @@ export default function ProgramManagement() {
   const createCalEventType = async (programId, quiet = false) => {
     try {
       setCalLoadingId(programId);
+
       const res = await axios.post(`${CAL_BASE}/event-types/${programId}`);
+      // backend: { linked, program, cal: { eventTypeId, scheduleId, slug, user } }
+      const body = res.data || {};
+      const calInfo = body.cal || {};
+
       await fetchPrograms();
+
       if (!quiet) {
         alert(
-          `Cal linked.\nID: ${res.data.cal_event_type_id}\nSlug: ${res.data.cal_slug}`
+          `Cal linked.\nID: ${calInfo.eventTypeId ?? "?"}\nSlug: ${
+            calInfo.slug ?? "?"
+          }`
         );
       }
     } catch (e) {
@@ -196,18 +175,41 @@ export default function ProgramManagement() {
       setCalLoadingId(null);
     }
   };
+
+  // sync Cal "Offer seats" with program max_capacity
+  const syncCalSeats = async (programId) => {
+    try {
+      await axios.post(`${CAL_BASE}/programs/${programId}/sync-seats`);
+    } catch (e) {
+      console.error("syncCalSeats:", e);
+      // silent; Cal may not be linked yet
+    }
+  };
+
+  // sync Cal duration (duration_minutes -> lengthInMinutes)
+  const syncCalDuration = async (programId) => {
+    try {
+      await axios.post(`${CAL_BASE}/programs/${programId}/sync-duration`);
+    } catch (e) {
+      console.error("syncCalDuration:", e);
+      // silent; Cal may not be linked yet
+    }
+  };
   /* ---------------------------------------------------------- */
 
   /* ---------------------- save/delete programs ---------------------- */
   const saveProgram = async () => {
-    // normalize category -> support_group / yoga / whatever
-    const normalizedCategory = (formData.category || "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_");
-    const isSupportGroup = normalizedCategory === "support_group";
+    const normalizedCategoryValue = normalizeCategory(formData.category);
+    const isSupportGroup = normalizedCategoryValue === "support_group";
+    const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
 
-    // base required for all programs
+    // any category that should automatically be wired to Cal
+    const wantsCalIntegration = isSupportGroup || isGentleExercise;
+
+    const storedCategory = isSupportGroup
+      ? "support_group"
+      : formData.category;
+
     const baseRequired = [
       "title",
       "description",
@@ -215,14 +217,10 @@ export default function ProgramManagement() {
       "location",
       "maxCapacity",
       "instructor",
+      "durationMinutes", // duration required so Cal length is never undefined
     ];
 
-    // non-support groups still require date+time
-    const required = isSupportGroup
-      ? baseRequired
-      : [...baseRequired, "date", "time"];
-
-    for (const f of required) {
+    for (const f of baseRequired) {
       if (!formData[f]) return alert("Fill all required fields.");
     }
 
@@ -232,17 +230,20 @@ export default function ProgramManagement() {
       }
     }
 
-    const extras = Array.from(new Set(formData.additionalDates || []))
-      .filter(Boolean)
-      .filter((d) => d !== formData.date);
+    if (isGentleExercise && !formData.subcategory) {
+      return alert("Select a subcategory for Gentle Exercise.");
+    }
 
     const payload = {
       title: formData.title.trim(),
       description: formData.description.trim(),
-      category: formData.category,
-      // support_group -> no admin date/time, Cal owns schedule
-      date: isSupportGroup ? null : formData.date,
-      time: isSupportGroup ? null : formData.time,
+      category: storedCategory,
+      subcategory: isGentleExercise ? formData.subcategory || null : null,
+
+      // scheduling is handled by Cal – keep these null
+      date: null,
+      time: null,
+
       location: formData.location.trim(),
       maxCapacity: parseInt(formData.maxCapacity, 10),
       instructor: formData.instructor.trim(),
@@ -254,24 +255,40 @@ export default function ProgramManagement() {
       sort_order: formData.sort_order || 0,
       is_active: formData.is_active ?? true,
 
-      // support_group -> no occurrences created from admin
-      additionalDates: isSupportGroup ? [] : extras,
+      additionalDates: [],
+
+      durationMinutes:
+        formData.durationMinutes !== ""
+          ? parseInt(formData.durationMinutes, 10)
+          : null,
     };
 
     try {
       setIsSaving(true);
+
       if (editMode && formData.id) {
+        // UPDATE
         await axios.put(`${API_BASE}/${formData.id}`, payload);
         await fetchPrograms();
+
+        if (wantsCalIntegration) {
+          await syncCalSeats(formData.id);
+          await syncCalDuration(formData.id);
+        }
       } else {
+        // CREATE
         const res = await axios.post(API_BASE, payload);
         const createdId = res.data?.id;
-        if (normalizedCategory === "support_group" && createdId) {
+
+        if (wantsCalIntegration && createdId) {
           await createCalEventType(createdId, true);
+          await syncCalSeats(createdId);
+          await syncCalDuration(createdId);
         } else {
           await fetchPrograms();
         }
       }
+
       closeProgramModal();
     } catch (e) {
       console.error("saveProgram:", e);
@@ -322,41 +339,6 @@ export default function ProgramManagement() {
   };
   /* ------------------------------------------------------------ */
 
-  /* ---------------------- multi-date picker ---------------------- */
-  const monthCursor = formData.monthCursor;
-  const [cursorYear, cursorMonthIndex0] = useMemo(() => {
-    if (!monthCursor) {
-      const now = new Date();
-      return [now.getFullYear(), now.getMonth()];
-    }
-    const [y, m] = monthCursor.split("-").map(Number);
-    return [y, m - 1];
-  }, [monthCursor]);
-
-  const monthRows = useMemo(
-    () => getMonthMatrix(cursorYear, cursorMonthIndex0),
-    [cursorYear, cursorMonthIndex0]
-  );
-
-  const toggleExtraDate = (ymd) => {
-    setFormData((prev) => {
-      const set = new Set(prev.additionalDates || []);
-      if (set.has(ymd)) set.delete(ymd);
-      else set.add(ymd);
-      return { ...prev, additionalDates: Array.from(set).sort() };
-    });
-  };
-
-  const removeExtraDate = (ymd) => {
-    setFormData((prev) => ({
-      ...prev,
-      additionalDates: (prev.additionalDates || []).filter(
-        (d) => d !== ymd
-      ),
-    }));
-  };
-  /* ------------------------------------------------------------------ */
-
   const stats = useMemo(() => {
     const total = programs.length;
     const upcoming = programs.filter((p) => p.status === "upcoming").length;
@@ -368,12 +350,9 @@ export default function ProgramManagement() {
     return { total, upcoming, completed, participants };
   }, [programs]);
 
-  // UI-level normalization for deciding whether to hide date/time UI
-  const normalizedCategory = (formData.category || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-  const isSupportGroup = normalizedCategory === "support_group";
+  const normalizedCategoryValue = normalizeCategory(formData.category);
+  const isSupportGroup = normalizedCategoryValue === "support_group";
+  const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
 
   return (
     <AdminLayout>
@@ -385,8 +364,8 @@ export default function ProgramManagement() {
               Program Management
             </h1>
             <p className="text-gray-500 text-sm">
-              Create programs, set multiple monthly sessions, and link Cal
-              booking.
+              Create programs and link Cal booking. Scheduling is managed in
+              Cal.com.
             </p>
           </div>
           <div className="flex gap-2">
@@ -434,11 +413,16 @@ export default function ProgramManagement() {
         {/* Programs list */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {programs.map((p) => {
+            const pNormCategory = normalizeCategory(p.category);
+            const isSupportGroupRow = pNormCategory === "support_group";
+
             const linked = !!p.cal_event_type_id;
             const bookingUrl =
               linked && p.cal_user && p.cal_slug
                 ? `https://cal.com/${p.cal_user}/${p.cal_slug}`
                 : null;
+
+            const durationLabel = formatDuration(p.duration_minutes);
 
             return (
               <div
@@ -450,11 +434,16 @@ export default function ProgramManagement() {
                     <h2 className="text-lg font-semibold text-gray-900">
                       {p.title}
                     </h2>
-                    <div className="mt-1 flex items-center gap-2 text-xs">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#f4f1ff] border border-[#e0d8ff] text-[#6b5df5]">
                         <Tag className="w-3 h-3" />
                         {p.category || "uncategorized"}
                       </span>
+                      {p.subcategory && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ecfeff] border border-[#bae6fd] text-[#0284c7]">
+                          {p.subcategory}
+                        </span>
+                      )}
                       {linked && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
@@ -482,6 +471,7 @@ export default function ProgramManagement() {
                   <div className="flex items-center gap-1">
                     <CalendarDays className="w-4 h-4 text-[#9b87f5]" />
                     <span>
+                      {/* date/time kept only for legacy display; schedule is Cal-only */}
                       {p.date} {p.time}
                     </span>
                   </div>
@@ -499,10 +489,15 @@ export default function ProgramManagement() {
                     <User className="w-4 h-4 text-[#f97373]" />
                     <span>{p.instructor}</span>
                   </div>
+                  {durationLabel && (
+                    <div className="flex items-center gap-1 col-span-2">
+                      <Timer className="w-4 h-4 text-[#9b87f5]" />
+                      <span>Duration: {durationLabel}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Support group meta */}
-                {p.category === "support_group" && (
+                {isSupportGroupRow && (
                   <div className="text-xs text-gray-500 flex flex-wrap gap-2">
                     <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
                       Day: {p.day_label || "-"}
@@ -522,41 +517,38 @@ export default function ProgramManagement() {
                   </div>
                 )}
 
-                {/* Cal actions for support groups */}
-                {p.category === "support_group" && (
-                  <div className="pt-2">
-                    {!linked ? (
-                      <button
-                        onClick={() => createCalEventType(p.id)}
-                        disabled={calLoadingId === p.id}
-                        className="inline-flex items-center gap-1 border border-[#c7d2fe] px-3 py-1.5 rounded-xl text-sm text-[#4338ca] bg-[#eef2ff] hover:bg-[#e0e7ff] disabled:opacity-60"
-                      >
-                        {calLoadingId === p.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
-                        Create Cal Event
-                      </button>
-                    ) : bookingUrl ? (
-                      <a
-                        href={bookingUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 border border-emerald-200 px-3 py-1.5 rounded-xl text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
-                      >
+                {/* Cal link / button for ALL programs */}
+                <div className="pt-2">
+                  {!linked ? (
+                    <button
+                      onClick={() => createCalEventType(p.id)}
+                      disabled={calLoadingId === p.id}
+                      className="inline-flex items-center gap-1 border border-[#c7d2fe] px-3 py-1.5 rounded-xl text-sm text-[#4338ca] bg-[#eef2ff] hover:bg-[#e0e7ff] disabled:opacity-60"
+                    >
+                      {calLoadingId === p.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
                         <Link2 className="w-4 h-4" />
-                        Open Booking Link
-                      </a>
-                    ) : (
-                      <p className="text-xs text-gray-500">
-                        Cal linked but missing user/slug.
-                      </p>
-                    )}
-                  </div>
-                )}
+                      )}
+                      Create Cal Event
+                    </button>
+                  ) : bookingUrl ? (
+                    <a
+                      href={bookingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 border border-emerald-200 px-3 py-1.5 rounded-xl text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Open Booking Link
+                    </a>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Cal linked but missing user/slug.
+                    </p>
+                  )}
+                </div>
 
-                {/* actions */}
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => openEdit(p)}
@@ -622,7 +614,11 @@ export default function ProgramManagement() {
                     className="w-full border rounded-xl px-3 py-2 text-sm"
                     value={formData.category}
                     onChange={(e) =>
-                      setFormData((p) => ({ ...p, category: e.target.value }))
+                      setFormData((p) => ({
+                        ...p,
+                        category: e.target.value,
+                        subcategory: "",
+                      }))
                     }
                   >
                     <option value="">Select category</option>
@@ -648,7 +644,28 @@ export default function ProgramManagement() {
                 </Field>
               </div>
 
-              {/* support group fields */}
+              {isGentleExercise && (
+                <Field label="Subcategory *">
+                  <select
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    value={formData.subcategory}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        subcategory: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Select subcategory</option>
+                    {GENTLE_EXERCISE_SUBCATS.map((sc) => (
+                      <option key={sc} value={sc}>
+                        {sc}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+
               {isSupportGroup && (
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Day Label *">
@@ -723,144 +740,6 @@ export default function ProgramManagement() {
                 </div>
               )}
 
-              {/* primary date/time + extra dates
-                  shown ONLY for non-support-group programs */}
-              {!isSupportGroup && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="Primary Date *">
-                      <input
-                        type="date"
-                        className="w-full border rounded-xl px-3 py-2 text-sm"
-                        value={formData.date}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            date: e.target.value,
-                            monthCursor: e.target.value
-                              ? e.target.value.slice(0, 7)
-                              : p.monthCursor,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Field label="Primary Time *">
-                      <input
-                        type="time"
-                        className="w-full border rounded-xl px-3 py-2 text-sm"
-                        value={formData.time}
-                        onChange={(e) =>
-                          setFormData((p) => ({ ...p, time: e.target.value }))
-                        }
-                      />
-                    </Field>
-                  </div>
-
-                  {/* multi-date picker */}
-                  <div className="rounded-2xl border bg-slate-50 p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div>
-                        <label className="text-sm font-medium block">
-                          Extra session dates (optional)
-                        </label>
-                        <p className="text-xs text-slate-500">
-                          Click multiple dates. All extras use Primary Time.
-                        </p>
-                      </div>
-                      <input
-                        type="month"
-                        className="border rounded-xl px-3 py-2 text-sm bg-white"
-                        value={formData.monthCursor}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            monthCursor: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-
-                    <div className="mt-3 bg-white rounded-xl border p-3">
-                      <div className="grid grid-cols-7 text-xs font-semibold text-slate-500 mb-2">
-                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                          (w) => (
-                            <div key={w} className="text-center">
-                              {w}
-                            </div>
-                          )
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-7 gap-1">
-                        {monthRows.flat().map((cell, idx) => {
-                          if (!cell) return <div key={idx} className="h-9" />;
-
-                          const ymd = toYMD(cell);
-                          const selected = (
-                            formData.additionalDates || []
-                          ).includes(ymd);
-                          const isPrimary = ymd === formData.date;
-
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() =>
-                                !isPrimary && toggleExtraDate(ymd)
-                              }
-                              className={[
-                                "h-9 rounded-lg text-sm flex items-center justify-center border",
-                                isPrimary
-                                  ? "bg-indigo-50 border-indigo-200 text-indigo-600 cursor-not-allowed"
-                                  : selected
-                                  ? "bg-emerald-100 border-emerald-300 text-emerald-800"
-                                  : "bg-white border-slate-200 hover:bg-slate-50",
-                              ].join(" ")}
-                              title={
-                                isPrimary
-                                  ? "Primary date"
-                                  : selected
-                                  ? "Remove extra"
-                                  : "Add extra"
-                              }
-                            >
-                              {cell.getDate()}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      {(formData.additionalDates || []).length === 0 ? (
-                        <p className="text-xs text-slate-500">
-                          No extra dates selected.
-                        </p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {formData.additionalDates.map((d) => (
-                            <span
-                              key={d}
-                              className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-white border text-xs"
-                            >
-                              {d}
-                              <button
-                                type="button"
-                                onClick={() => removeExtraDate(d)}
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* location/capacity */}
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Location *">
                   <input
@@ -887,6 +766,22 @@ export default function ProgramManagement() {
                 </Field>
               </div>
 
+              <Field label="Program Duration (minutes) *">
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full border rounded-xl px-3 py-2 text-sm"
+                  value={formData.durationMinutes}
+                  onChange={(e) =>
+                    setFormData((p) => ({
+                      ...p,
+                      durationMinutes: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. 60"
+                />
+              </Field>
+
               <Field label="Status">
                 <select
                   className="w-full border rounded-xl px-3 py-2 text-sm"
@@ -900,7 +795,6 @@ export default function ProgramManagement() {
                 </select>
               </Field>
 
-              {/* actions */}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   onClick={closeProgramModal}

@@ -4,7 +4,9 @@ import { pool } from "../db.js";
 import {
   cal,
   createEventType,
+  createSchedule,
   getEventType,
+  updateEventType,
 } from "../lib/calClient.js";
 
 const router = express.Router();
@@ -36,16 +38,42 @@ function makeSlug(title, id) {
 }
 
 /* -------------------------------
+   Seats from capacity
+   -> returns proper nested seats object for v2
+   seats: { seatsPerTimeSlot, showAttendeeInfo, showAvailabilityCount }
+-------------------------------- */
+function makeSeatsObjectFromCapacity(capacity) {
+  const capNum = Number(capacity);
+  if (!capNum || !Number.isFinite(capNum) || capNum <= 0) {
+    // No valid capacity → don't enable seats
+    return undefined;
+  }
+
+  return {
+    seatsPerTimeSlot: capNum,
+    showAttendeeInfo: false,
+    showAvailabilityCount: true,
+  };
+}
+
+/* -------------------------------
    Core linker
    programId param name is flexible
 -------------------------------- */
 async function linkProgramToCal(programId, res) {
   try {
-    // 1) Load program
+    // 1) Load program - include max_capacity + duration_minutes
     const progRes = await pool.query(
       `
-      SELECT id, title, description,
-             cal_event_type_id, cal_schedule_id, cal_slug, cal_user
+      SELECT id,
+             title,
+             description,
+             max_capacity,
+             duration_minutes,
+             cal_event_type_id,
+             cal_schedule_id,
+             cal_slug,
+             cal_user
       FROM programs
       WHERE id = $1
       `,
@@ -92,18 +120,48 @@ async function linkProgramToCal(programId, res) {
       }
     }
 
-    // 3) Create NEW event type for THIS program
+    // 3) Create a NEW schedule for THIS program
     const title = prog.title || "Support Group";
+    const scheduleName = `Program ${prog.id}: ${title}`;
+
+    let schedule;
+    try {
+      schedule = await createSchedule({
+        name: scheduleName,
+        timeZone: CAL_TZ,
+        availability: [], // admin will configure dates/times in Cal UI
+        overrides: [],
+        isDefault: false,
+      });
+    } catch (err) {
+      console.error("❌ Cal createSchedule error:", err.message);
+      return res
+        .status(502)
+        .json({ error: err.message || "Failed to create Cal schedule" });
+    }
+
+    const scheduleId = schedule.id;
+
+    // 4) Create NEW event type using that schedule
     const slug = makeSlug(title, prog.id);
     const desc = (prog.description || "").slice(0, 250);
 
-    // No scheduleId here → Cal uses its own default schedule.
+    const seats = makeSeatsObjectFromCapacity(prog.max_capacity);
+
+    // derive duration from DB, fallback to 60
+    const lengthMinutes =
+      Number(prog.duration_minutes) && Number(prog.duration_minutes) > 0
+        ? Number(prog.duration_minutes)
+        : 60;
+
     const payload = {
       title,
       slug,
       description: desc,
-      lengthInMinutes: 60,
+      lengthInMinutes: lengthMinutes,
+      scheduleId, // attach this event type to the program-specific schedule
       metadata: {},
+      ...(seats ? { seats } : {}),
     };
 
     let created;
@@ -117,11 +175,10 @@ async function linkProgramToCal(programId, res) {
     }
 
     const eventTypeId = created.id;
-    const scheduleId = created.scheduleId ?? null;
     const calSlug = created.slug || slug;
     const calUser = CAL_USER;
 
-    // 4) Persist to programs
+    // 5) Persist to programs
     const updateRes = await pool.query(
       `
       UPDATE programs
@@ -156,14 +213,119 @@ async function linkProgramToCal(programId, res) {
 }
 
 /* -------------------------------
-   NEW: fetch slots from Cal for a program
+   Sync seats (capacity -> Cal)
+   POST /api/cal/programs/:id/sync-seats
+-------------------------------- */
+router.post("/programs/:id/sync-seats", async (req, res) => {
+  try {
+    const programId = req.params.id;
+
+    const progRes = await pool.query(
+      `
+      SELECT id, title, max_capacity, cal_event_type_id
+      FROM programs
+      WHERE id = $1
+      `,
+      [programId]
+    );
+
+    if (progRes.rows.length === 0) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const prog = progRes.rows[0];
+
+    if (!prog.cal_event_type_id) {
+      return res
+        .status(400)
+        .json({ error: "Program is not linked to a Cal event type" });
+    }
+
+    const seats = makeSeatsObjectFromCapacity(prog.max_capacity);
+
+    if (!seats) {
+      return res.status(400).json({
+        error:
+          "Program max_capacity is not a positive number, cannot sync seats",
+      });
+    }
+
+    const updatedEventType = await updateEventType(prog.cal_event_type_id, {
+      seats,
+    });
+
+    return res.json({
+      ok: true,
+      programId: prog.id,
+      eventTypeId: prog.cal_event_type_id,
+      seats,
+      eventType: updatedEventType,
+    });
+  } catch (err) {
+    console.error("❌ Error syncing seats to Cal:", err);
+    return res.status(500).json({ error: "Failed to sync seats to Cal" });
+  }
+});
+
+/* -------------------------------
+   Sync duration (duration_minutes -> lengthInMinutes)
+   POST /api/cal/programs/:id/sync-duration
+-------------------------------- */
+router.post("/programs/:id/sync-duration", async (req, res) => {
+  try {
+    const programId = req.params.id;
+
+    const progRes = await pool.query(
+      `
+      SELECT id, title, duration_minutes, cal_event_type_id
+      FROM programs
+      WHERE id = $1
+      `,
+      [programId]
+    );
+
+    if (progRes.rows.length === 0) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const prog = progRes.rows[0];
+
+    if (!prog.cal_event_type_id) {
+      return res
+        .status(400)
+        .json({ error: "Program is not linked to a Cal event type" });
+    }
+
+    const lengthMinutes =
+      Number(prog.duration_minutes) && Number(prog.duration_minutes) > 0
+        ? Number(prog.duration_minutes)
+        : 60;
+
+    const updatedEventType = await updateEventType(prog.cal_event_type_id, {
+      lengthInMinutes: lengthMinutes,
+    });
+
+    return res.json({
+      ok: true,
+      programId: prog.id,
+      eventTypeId: prog.cal_event_type_id,
+      lengthInMinutes,
+      eventType: updatedEventType,
+    });
+  } catch (err) {
+    console.error("❌ Error syncing duration to Cal:", err);
+    return res.status(500).json({ error: "Failed to sync duration to Cal" });
+  }
+});
+
+/* -------------------------------
+   Fetch slots from Cal for a program
    GET /api/cal/programs/:id/slots
 -------------------------------- */
 router.get("/programs/:id/slots", async (req, res) => {
   try {
     const programId = req.params.id;
 
-    // 1) Load program + event type id
     const progRes = await pool.query(
       `
       SELECT id, title, cal_event_type_id
@@ -187,19 +349,20 @@ router.get("/programs/:id/slots", async (req, res) => {
 
     const eventTypeId = prog.cal_event_type_id;
 
-    // 2) Define window: today → +90 days
     const now = new Date();
     const start = now.toISOString();
     const endDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const end = endDate.toISOString();
 
-    // 3) Call Cal slots endpoint
     const apiRes = await cal.get("/slots", {
       params: {
         eventTypeId,
         start,
         end,
         timeZone: CAL_TZ,
+      },
+      headers: {
+        "cal-api-version": "2024-09-04",
       },
     });
 
@@ -209,8 +372,6 @@ router.get("/programs/:id/slots", async (req, res) => {
     const slots = [];
     const dateSet = new Set();
 
-    // Case 1: new shape (what your curl showed)
-    // data = { "YYYY-MM-DD": [ { start: "..." }, ... ], ... }
     if (
       data &&
       typeof data === "object" &&
@@ -231,9 +392,7 @@ router.get("/programs/:id/slots", async (req, res) => {
           });
         }
       }
-    }
-    // Case 2: old docs style: data.slots = [ { startTime: ... } ]
-    else if (Array.isArray(data.slots)) {
+    } else if (Array.isArray(data.slots)) {
       for (const s of data.slots) {
         const isoStart = s.startTime || s.start || s.start_time || "";
         if (!isoStart) continue;
@@ -245,9 +404,7 @@ router.get("/programs/:id/slots", async (req, res) => {
           start: isoStart,
         });
       }
-    }
-    // Case 3: worst case fallback – data is already an array
-    else if (Array.isArray(data)) {
+    } else if (Array.isArray(data)) {
       for (const s of data) {
         const isoStart = s.startTime || s.start || s.start_time || "";
         if (!isoStart) continue;
@@ -278,7 +435,7 @@ router.get("/programs/:id/slots", async (req, res) => {
 });
 
 /* -------------------------------
-   Existing routes
+   Linking routes
 -------------------------------- */
 
 // This matches your current frontend: POST /api/cal/event-types/:programId
@@ -287,7 +444,6 @@ router.post("/event-types/:programId", async (req, res) => {
   return linkProgramToCal(programId, res);
 });
 
-// Alternative paths if you ever refactor frontend:
 router.post("/programs/:id/event-type", async (req, res) => {
   const programId = req.params.id;
   return linkProgramToCal(programId, res);

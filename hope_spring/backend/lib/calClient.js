@@ -2,9 +2,7 @@
 import axios from "axios";
 
 const CAL_BASE = "https://api.cal.com/v2";
-//const CAL_VERSION = "2024-06-14";
-const CAL_VERSION = "2024-09-04";
-
+const CAL_VERSION = "2024-06-14";
 
 /* ============================================
    Load API key lazily (dotenv loads before use)
@@ -108,7 +106,6 @@ export async function updateSchedule(scheduleId, patch = {}) {
   if (patch.name !== undefined) payload.name = patch.name;
   if (patch.timeZone !== undefined) payload.timeZone = patch.timeZone;
 
-  // allow empty array to be sent (important when resetting)
   if (patch.availability !== undefined && Array.isArray(patch.availability)) {
     payload.availability = patch.availability;
   }
@@ -127,28 +124,35 @@ export async function updateSchedule(scheduleId, patch = {}) {
 /* ============================================
    EVENT TYPES
 ============================================ */
-export async function createEventType({
-  title,
-  slug,
-  description = "",
-  lengthInMinutes = 60,
-  host,
-  metadata = {},
-  scheduleId,
-  bookingWindow, // optional
-}) {
+/**
+ * We forward *any* extra fields (like seatsPerTimeSlot,
+ * seatsShowAttendees, seatsShowAvailabilityCount, etc.)
+ * straight through to Cal.
+ */
+export async function createEventType(input) {
+  const {
+    title,
+    slug,
+    description = "",
+    lengthInMinutes = 60,
+    host,
+    metadata = {},
+    scheduleId,
+    bookingWindow,
+    ...rest // <- seatsPerTimeSlot, seatsShowAttendees, etc.
+  } = input;
+
   const payload = {
     title,
     slug,
     description,
     lengthInMinutes,
     metadata,
+    ...rest,
   };
 
   if (host !== undefined) payload.host = host;
   if (scheduleId !== undefined) payload.scheduleId = scheduleId;
-
-  // allow disabled/range/null if you ever pass it
   if (bookingWindow !== undefined) payload.bookingWindow = bookingWindow;
 
   return calPost("/event-types", payload);
@@ -157,21 +161,29 @@ export async function createEventType({
 export async function updateEventType(eventTypeId, patch = {}) {
   if (!eventTypeId) throw new Error("updateEventType: eventTypeId required");
 
-  const payload = {};
+  const {
+    title,
+    slug,
+    description,
+    lengthInMinutes,
+    host,
+    scheduleId,
+    metadata,
+    bookingWindow,
+    ...rest // again: seatsPerTimeSlot, seatsShowAttendees, etc.
+  } = patch;
 
-  if (patch.title !== undefined) payload.title = patch.title;
-  if (patch.slug !== undefined) payload.slug = patch.slug;
-  if (patch.description !== undefined) payload.description = patch.description;
-  if (patch.lengthInMinutes !== undefined)
-    payload.lengthInMinutes = patch.lengthInMinutes;
-  if (patch.host !== undefined) payload.host = patch.host;
-  if (patch.scheduleId !== undefined) payload.scheduleId = patch.scheduleId;
-  if (patch.metadata !== undefined) payload.metadata = patch.metadata;
+  const payload = { ...rest };
 
-  // ✅ THIS IS THE CRITICAL FIX
-  // allow null or {disabled:true} to be sent
-  if (patch.bookingWindow !== undefined)
-    payload.bookingWindow = patch.bookingWindow;
+  if (title !== undefined) payload.title = title;
+  if (slug !== undefined) payload.slug = slug;
+  if (description !== undefined) payload.description = description;
+  if (lengthInMinutes !== undefined)
+    payload.lengthInMinutes = lengthInMinutes;
+  if (host !== undefined) payload.host = host;
+  if (scheduleId !== undefined) payload.scheduleId = scheduleId;
+  if (metadata !== undefined) payload.metadata = metadata;
+  if (bookingWindow !== undefined) payload.bookingWindow = bookingWindow;
 
   return calPatch(`/event-types/${eventTypeId}`, payload);
 }
