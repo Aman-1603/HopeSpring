@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Search, Send, Loader2, UserCircle2 } from "lucide-react";
+import AdminLayout from "../AdminLayout";
 
 export default function AdminSupport() {
   const [selectedUser, setSelectedUser] = useState(null);
@@ -54,6 +55,7 @@ export default function AdminSupport() {
   };
 
   return (
+    <AdminLayout>
     <div className="h-screen flex bg-gray-50">
 
       {/* LEFT SIDEBAR — User List */}
@@ -179,5 +181,6 @@ export default function AdminSupport() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

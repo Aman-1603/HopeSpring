@@ -26,7 +26,7 @@ const adminNavItems = [
   { name: "Announcements", path: "/admin/announcements", icon: Megaphone },
   { name: "Event Calendar", path: "/admin/EventCalendar", icon: CalendarDays },
   { name: "Analytics", path: "/admin/analytics", icon: BarChart3 },
-  { name: "Communication", path: "/admin/communication", icon: MessageSquare },
+  { name: "Communication", path: "/admin/AdminSupport", icon: MessageSquare },
   { name: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
