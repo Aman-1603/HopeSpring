@@ -38,21 +38,27 @@ function makeSlug(title, id) {
 }
 
 /* -------------------------------
-   Seats from capacity
-   -> returns proper nested seats object for v2
-   seats: { seatsPerTimeSlot, showAttendeeInfo, showAvailabilityCount }
+   Seats from capacity  (TOP-LEVEL FIELDS)
+   Cal v2 still expects:
+
+     seatsPerTimeSlot
+     seatsShowAttendees
+     seatsShowAvailabilityCount
+
+   as top-level properties on the event type,
+   NOT a nested `seats: { ... }` object.
 -------------------------------- */
-function makeSeatsObjectFromCapacity(capacity) {
+function makeSeatsPatchFromCapacity(capacity) {
   const capNum = Number(capacity);
   if (!capNum || !Number.isFinite(capNum) || capNum <= 0) {
-    // No valid capacity → don't enable seats
-    return undefined;
+    // no valid capacity → don't enable seats
+    return null;
   }
 
   return {
     seatsPerTimeSlot: capNum,
-    showAttendeeInfo: false,
-    showAvailabilityCount: true,
+    seatsShowAttendees: false,
+    seatsShowAvailabilityCount: true,
   };
 }
 
@@ -146,7 +152,7 @@ async function linkProgramToCal(programId, res) {
     const slug = makeSlug(title, prog.id);
     const desc = (prog.description || "").slice(0, 250);
 
-    const seats = makeSeatsObjectFromCapacity(prog.max_capacity);
+    const seatsPatch = makeSeatsPatchFromCapacity(prog.max_capacity);
 
     // derive duration from DB, fallback to 60
     const lengthMinutes =
@@ -161,11 +167,15 @@ async function linkProgramToCal(programId, res) {
       lengthInMinutes: lengthMinutes,
       scheduleId, // attach this event type to the program-specific schedule
       metadata: {},
-      ...(seats ? { seats } : {}),
+      ...(seatsPatch || {}), // <- TOP LEVEL
     };
 
     let created;
     try {
+      console.log(
+        "[Cal] createEventType payload:",
+        JSON.stringify(payload, null, 2)
+      );
       created = await createEventType(payload);
     } catch (err) {
       console.error("❌ Cal createEventType error:", err.message);
@@ -241,24 +251,31 @@ router.post("/programs/:id/sync-seats", async (req, res) => {
         .json({ error: "Program is not linked to a Cal event type" });
     }
 
-    const seats = makeSeatsObjectFromCapacity(prog.max_capacity);
+    const seatsPatch = makeSeatsPatchFromCapacity(prog.max_capacity);
 
-    if (!seats) {
+    if (!seatsPatch) {
       return res.status(400).json({
         error:
           "Program max_capacity is not a positive number, cannot sync seats",
       });
     }
 
+    console.log(
+      "[Cal] sync seats → eventType",
+      prog.cal_event_type_id,
+      "payload",
+      seatsPatch
+    );
+
     const updatedEventType = await updateEventType(prog.cal_event_type_id, {
-      seats,
+      ...seatsPatch,
     });
 
     return res.json({
       ok: true,
       programId: prog.id,
       eventTypeId: prog.cal_event_type_id,
-      seats,
+      seats: seatsPatch,
       eventType: updatedEventType,
     });
   } catch (err) {
@@ -301,6 +318,13 @@ router.post("/programs/:id/sync-duration", async (req, res) => {
         ? Number(prog.duration_minutes)
         : 60;
 
+    console.log(
+      "[Cal] sync duration → eventType",
+      prog.cal_event_type_id,
+      "lengthInMinutes",
+      lengthMinutes
+    );
+
     const updatedEventType = await updateEventType(prog.cal_event_type_id, {
       lengthInMinutes: lengthMinutes,
     });
@@ -309,7 +333,7 @@ router.post("/programs/:id/sync-duration", async (req, res) => {
       ok: true,
       programId: prog.id,
       eventTypeId: prog.cal_event_type_id,
-      lengthInMinutes,
+      lengthMinutes,
       eventType: updatedEventType,
     });
   } catch (err) {

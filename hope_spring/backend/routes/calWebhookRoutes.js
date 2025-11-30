@@ -5,7 +5,6 @@ import { pool } from "../db.js";
 const router = express.Router();
 
 // IMPORTANT: server.js must mount this router with express.raw({ type: "application/json" })
-// so req.body here will be a Buffer, not already JSON-parsed.
 
 router.post("/", async (req, res) => {
   try {
@@ -14,13 +13,18 @@ router.post("/", async (req, res) => {
     const payload = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
 
     // Cal sometimes wraps in { triggerEvent, createdAt, payload: { ...actual booking... } }
-    // or in { data: { ... } }
     const root = payload?.data || payload;
     const data = root?.payload || root;
 
     if (!data) {
       console.warn("[Cal webhook] No data in payload", payload);
       return res.status(400).json({ error: "No data" });
+    }
+
+    // 🔹 Handle Cal "Ping test" payloads gracefully (no booking id, type === "Test")
+    if (data.type === "Test" || payload.type === "Test") {
+      console.log("[Cal webhook] Received test ping from Cal — acknowledging OK.");
+      return res.json({ ok: true, test: true });
     }
 
     // booking id / uid
@@ -48,7 +52,7 @@ router.post("/", async (req, res) => {
     // status
     const status = data.status || "confirmed";
 
-    // attendee info – prefer attendees array, fall back to direct fields
+    // attendee info 
     const primary =
       data.attendee ||
       (Array.isArray(data.attendees) ? data.attendees[0] : null) ||
@@ -141,7 +145,7 @@ router.post("/", async (req, res) => {
         startTime,
         endTime,
         calEventTypeId,
-        data, // store the unwrapped data as raw
+        payload, // 🔹 store full original payload, not just `data`
       ]
     );
 

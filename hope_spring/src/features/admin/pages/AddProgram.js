@@ -38,7 +38,7 @@ const emptyForm = {
   instructor: "",
   status: "upcoming",
 
-  // support group only
+  // support group only (but fields exist for all)
   day_label: "",
   time_label: "",
   column_index: 1,
@@ -176,16 +176,6 @@ export default function ProgramManagement() {
     }
   };
 
-  // sync Cal "Offer seats" with program max_capacity
-  const syncCalSeats = async (programId) => {
-    try {
-      await axios.post(`${CAL_BASE}/programs/${programId}/sync-seats`);
-    } catch (e) {
-      console.error("syncCalSeats:", e);
-      // silent; Cal may not be linked yet
-    }
-  };
-
   // sync Cal duration (duration_minutes -> lengthInMinutes)
   const syncCalDuration = async (programId) => {
     try {
@@ -272,7 +262,7 @@ export default function ProgramManagement() {
         await fetchPrograms();
 
         if (wantsCalIntegration) {
-          await syncCalSeats(formData.id);
+          // Only duration is synced. Seats are managed in Cal dashboard UI.
           await syncCalDuration(formData.id);
         }
       } else {
@@ -281,8 +271,9 @@ export default function ProgramManagement() {
         const createdId = res.data?.id;
 
         if (wantsCalIntegration && createdId) {
+          // 1) Create Cal schedule + event type
           await createCalEventType(createdId, true);
-          await syncCalSeats(createdId);
+          // 2) Sync duration from DB → Cal eventType.lengthInMinutes
           await syncCalDuration(createdId);
         } else {
           await fetchPrograms();
@@ -371,7 +362,7 @@ export default function ProgramManagement() {
           <div className="flex gap-2">
             <button
               onClick={() => setShowCategoriesModal(true)}
-              className="flex items-center gap-1 border border-[#d0c8ff] text-[#6b5df5] px-3 py-2 rounded-xl text-sm bg-white hover:bg-[#f4f1ff]"
+              className="flex items-center gap-1 border border-[#d0c8ff] text-[#6b5df5] px-3 py-2 rounded-xl text-sm bg:white hover:bg-[#f4f1ff]"
             >
               <Tag className="w-4 h-4" />
               Categories
@@ -497,25 +488,29 @@ export default function ProgramManagement() {
                   )}
                 </div>
 
-                {isSupportGroupRow && (
-                  <div className="text-xs text-gray-500 flex flex-wrap gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Day: {p.day_label || "-"}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      TimeLabel: {p.time_label || "-"}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Column: {p.column_index === 2 ? "Right" : "Left"}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Order: {p.sort_order || 0}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
-                      Active: {p.is_active ? "Yes" : "No"}
-                    </span>
-                  </div>
-                )}
+                {/* Column / ordering / active shown for ALL programs.
+                    Day/Time only really meaningful for support groups. */}
+                <div className="text-xs text-gray-500 flex flex-wrap gap-2">
+                  {isSupportGroupRow && (
+                    <>
+                      <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
+                        Day: {p.day_label || "-"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
+                        TimeLabel: {p.time_label || "-"}
+                      </span>
+                    </>
+                  )}
+                  <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
+                    Column: {p.column_index === 2 ? "Right" : "Left"}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
+                    Order: {p.sort_order || 0}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-gray-50 border">
+                    Active: {p.is_active ? "Yes" : "No"}
+                  </span>
+                </div>
 
                 {/* Cal link / button for ALL programs */}
                 <div className="pt-2">
@@ -666,6 +661,7 @@ export default function ProgramManagement() {
                 </Field>
               )}
 
+              {/* Support-group-only labels */}
               {isSupportGroup && (
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Day Label *">
@@ -693,52 +689,55 @@ export default function ProgramManagement() {
                       }
                     />
                   </Field>
-
-                  <Field label="Column">
-                    <select
-                      className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.column_index}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          column_index: parseInt(e.target.value, 10),
-                        }))
-                      }
-                    >
-                      <option value={1}>Left</option>
-                      <option value={2}>Right</option>
-                    </select>
-                  </Field>
-
-                  <Field label="Sort Order">
-                    <input
-                      type="number"
-                      className="w-full border rounded-xl px-3 py-2 text-sm"
-                      value={formData.sort_order}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          sort_order: parseInt(e.target.value, 10),
-                        }))
-                      }
-                    />
-                  </Field>
-
-                  <label className="col-span-2 flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          is_active: e.target.checked,
-                        }))
-                      }
-                    />
-                    Active
-                  </label>
                 </div>
               )}
+
+              {/* Column / sort / active – for ALL categories */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Column">
+                  <select
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    value={formData.column_index}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        column_index: parseInt(e.target.value, 10),
+                      }))
+                    }
+                  >
+                    <option value={1}>Left</option>
+                    <option value={2}>Right</option>
+                  </select>
+                </Field>
+
+                <Field label="Sort Order">
+                  <input
+                    type="number"
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    value={formData.sort_order}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        sort_order: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                  />
+                </Field>
+
+                <label className="col-span-2 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        is_active: e.target.checked,
+                      }))
+                    }
+                  />
+                  Active
+                </label>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Location *">
@@ -875,7 +874,9 @@ function StatCard({ label, value, icon }) {
     <div className="bg-white/80 border rounded-2xl p-4 shadow-sm flex items-center justify-between">
       <div>
         <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-2xl font-semibold text-gray-800 mt-1">{value}</p>
+        <p className="text-2xl font-semibold text-gray-8
+
+00 mt-1">{value}</p>
       </div>
       {icon}
     </div>
