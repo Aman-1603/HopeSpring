@@ -17,6 +17,7 @@ import calWebhookRoutes from "./routes/calWebhookRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js"
 import adminSupportRoutes from './routes/adminSupportRoutes.js'
 import waitlistRoutes from "./routes/waitlistRoutes.js";
+import adminBookingsRoute from "./routes/adminBookings.js";
 
 
 dotenv.config();
@@ -111,6 +112,9 @@ app.use("/api/support", supportRoutes);
 
 //adminsupport
 app.use("/api/admin/support", adminSupportRoutes);
+
+//routes for the fetch the booking for the admin
+app.use("/api/admin/bookings", adminBookingsRoute);
 
 // LOGIN
 app.post("/api/login", async (req, res) => {

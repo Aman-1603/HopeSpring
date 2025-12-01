@@ -1,85 +1,101 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import { ChevronDown, ChevronUp, Users, Calendar, Mail, User2 } from "lucide-react";
 import AdminLayout from "../AdminLayout";
 
-export default function AdminBookingUI() {
+const API = process.env.REACT_APP_API_URL;
+
+const groupByProgram = (rows) => {
+  const map = new Map();
+
+  rows.forEach((row) => {
+    const pid = row.program_id || "no-program";
+
+    if (!map.has(pid)) {
+      map.set(pid, {
+        programId: pid,
+        name: row.program_title || "Untitled Program",
+        type: row.program_type || row.cal_event_type_id || "Program",
+        facilitator: row.facilitator_name || "Not assigned",
+        start: row.event_start,
+        end: row.event_end,
+        bookingsCount: 0,
+        bookings: [],
+      });
+    }
+
+    const group = map.get(pid);
+    group.bookingsCount += 1;
+    group.bookings.push({
+      id: row.id,
+      attendee_name: row.attendee_name,
+      email: row.attendee_email,
+      status: row.status,
+      event_start: row.event_start,
+      event_end: row.event_end,
+      created_at: row.created_at,
+    });
+  });
+
+  return Array.from(map.values());
+};
+
+export default function AdminBookingFetch() {
+  const [programs, setPrograms] = useState([]);
   const [openProgram, setOpenProgram] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Temporary data
-  const programs = [
-    {
-      id: 1,
-      name: "Yoga & Wellness",
-      type: "Health Program",
-      facilitator: "Sarah Thompson",
-      bookingsCount: 12,
-      start: "2025-01-12T10:00:00",
-      end: "2025-01-12T11:00:00",
+  useEffect(() => {
+    fetchBookings();
+  }, []);
 
-      bookings: [
-        {
-          id: 101,
-          attendee_name: "Alice Johnson",
-          email: "alice@example.com",
-          status: "confirmed",
-          event_start: "2025-01-12T10:00:00",
-          event_end: "2025-01-12T11:00:00",
-          created_at: "2025-01-10T14:21:00",
-        },
-        {
-          id: 102,
-          attendee_name: "Mark Peterson",
-          email: "mark@example.com",
-          status: "pending",
-          event_start: "2025-01-12T10:00:00",
-          event_end: "2025-01-12T11:00:00",
-          created_at: "2025-01-09T11:50:00",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Nutrition Counselling",
-      type: "1-on-1 Session",
-      facilitator: "Dr. Emily Carter",
-      bookingsCount: 4,
-      start: "2025-01-15T13:00:00",
-      end: "2025-01-15T13:45:00",
+const fetchBookings = async () => {
+  try {
+    const token = localStorage.getItem("token"); // 👈 GET TOKEN
 
-      bookings: [
-        {
-          id: 201,
-          attendee_name: "Sasha Morgan",
-          email: "sasha@example.com",
-          status: "confirmed",
-          event_start: "2025-01-15T13:00:00",
-          event_end: "2025-01-15T13:45:00",
-          created_at: "2025-01-11T12:30:00",
-        },
-      ],
-    },
-  ];
+    const res = await axios.get(`${API}/api/admin/bookings`, {
+      headers: {
+        Authorization: `Bearer ${token}`, // 👈 SEND TOKEN
+      },
+    });
+
+    const rows = res.data.bookings || [];
+    const grouped = groupByProgram(rows);
+    setPrograms(grouped);
+
+  } catch (err) {
+    console.error("Booking fetch error:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <AdminLayout>
     <div className="p-6">
-
       {/* Page Header */}
       <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text">
         Program Bookings
       </h1>
 
+      {programs.length === 0 && (
+        <p className="text-gray-500">No bookings found yet.</p>
+      )}
+
       <div className="space-y-6">
         {programs.map((program) => (
           <div
-            key={program.id}
+            key={program.programId}
             className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all"
           >
             {/* Program Header */}
             <div
               className="flex justify-between items-center cursor-pointer"
               onClick={() =>
-                setOpenProgram(openProgram === program.id ? null : program.id)
+                setOpenProgram(
+                  openProgram === program.programId ? null : program.programId
+                )
               }
             >
               <div>
@@ -109,17 +125,19 @@ export default function AdminBookingUI() {
                   </span>
                 </div>
 
-                {/* Date/Time */}
-                <div className="flex items-center gap-2 text-green-600">
-                  <Calendar size={18} />
-                  <span>
-                    {new Date(program.start).toLocaleDateString()}{" "}
-                    ({new Date(program.start).toLocaleTimeString()})
-                  </span>
-                </div>
+                {/* Date/Time (first event) */}
+                {program.start && (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <Calendar size={18} />
+                    <span>
+                      {new Date(program.start).toLocaleDateString()}{" "}
+                      ({new Date(program.start).toLocaleTimeString()})
+                    </span>
+                  </div>
+                )}
 
                 {/* Expand Icon */}
-                {openProgram === program.id ? (
+                {openProgram === program.programId ? (
                   <ChevronUp size={22} className="text-gray-500" />
                 ) : (
                   <ChevronDown size={22} className="text-gray-500" />
@@ -128,7 +146,7 @@ export default function AdminBookingUI() {
             </div>
 
             {/* Expanded Booking Table */}
-            {openProgram === program.id && (
+            {openProgram === program.programId && (
               <div className="mt-5 bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <table className="w-full text-left text-gray-600">
                   <thead className="bg-gray-100 text-gray-600 uppercase text-sm border-b">
@@ -170,15 +188,18 @@ export default function AdminBookingUI() {
                         </td>
 
                         <td className="p-3">
-                          {new Date(b.event_start).toLocaleString()}
+                          {b.event_start &&
+                            new Date(b.event_start).toLocaleString()}
                         </td>
 
                         <td className="p-3">
-                          {new Date(b.event_end).toLocaleString()}
+                          {b.event_end &&
+                            new Date(b.event_end).toLocaleString()}
                         </td>
 
                         <td className="p-3">
-                          {new Date(b.created_at).toLocaleString()}
+                          {b.created_at &&
+                            new Date(b.created_at).toLocaleString()}
                         </td>
                       </tr>
                     ))}
