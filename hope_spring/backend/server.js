@@ -14,6 +14,8 @@ import calendarEventRoutes from "../backend/routes/calendarEvents.js";
 import donateRoutes from "../backend/routes/donateRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import calWebhookRoutes from "./routes/calWebhookRoutes.js";
+import supportRoutes from "./routes/supportRoutes.js"
+import adminSupportRoutes from './routes/adminSupportRoutes.js'
 
 dotenv.config();
 
@@ -101,6 +103,12 @@ app.use("/api/calendar-events", calendarEventRoutes);
 
 // for stripe payment for the donation section
 app.use("/api/donate", donateRoutes);
+
+//support users
+app.use("/api/support", supportRoutes);
+
+//adminsupport
+app.use("/api/admin/support", adminSupportRoutes);
 
 // LOGIN
 app.post("/api/login", async (req, res) => {
