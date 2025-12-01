@@ -55,6 +55,7 @@ import AdminEventCalendar from "../features/admin/pages/AdminEventCalendar";
 import AdminSettings from "../features/admin/pages/AdminSettings";
 import Announcements from "../features/admin/pages/Announcements";
 import DonateSuccess from "../components/Pages/DonateSuccess";
+import AdminWaitlist from "../features/admin/pages/AdminWaitlist";
 
 // User Section
 import UserDashboard from "../features/user/pages/UserDashboard";
@@ -267,6 +268,18 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+                    <Route
+            path="/admin/waitlist"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminWaitlist />
+              </ProtectedRoute>
+            }
+          />
+
+        
+
           <Route
             path="/admin/announcements"
             element={
