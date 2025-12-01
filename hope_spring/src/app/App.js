@@ -64,6 +64,7 @@ import PastSessions from "../features/user/pages/PastSessions";
 import Support from "../components/Pages/Support/UsersSupport";
 import AdminSupport from "../features/admin/pages/AdminSupport";
 import AdminBookings from "../features/admin/pages/AdminBookingFetch";
+import FaciliatorDashboard from "../features/facilitator/FacilitatorDashboard.js"
 
 export default function App() {
   const location = useLocation();
@@ -203,7 +204,9 @@ export default function App() {
 
           {/* Users Support */}
           <Route path="/support" element={<Support />} />
-          
+
+          <Route path="/faciliator" element={<FaciliatorDashboard />} />
+
 
           {/* ===== ADMIN ROUTES ===== */}
           <Route
