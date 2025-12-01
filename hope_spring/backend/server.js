@@ -16,6 +16,8 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import calWebhookRoutes from "./routes/calWebhookRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js"
 import adminSupportRoutes from './routes/adminSupportRoutes.js'
+import waitlistRoutes from "./routes/waitlistRoutes.js";
+
 
 dotenv.config();
 
@@ -230,6 +232,7 @@ app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/cal", calRoutes);
+app.use("/api/waitlist", waitlistRoutes);
 
 /* ------------------------------------------
    Start Server
