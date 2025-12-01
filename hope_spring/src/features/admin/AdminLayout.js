@@ -25,7 +25,7 @@ const adminNavItems = [
   { name: "Attendance", path: "/admin/attendance", icon: CheckSquare },
   { name: "Announcements", path: "/admin/announcements", icon: Megaphone },
   { name: "Event Calendar", path: "/admin/EventCalendar", icon: CalendarDays },
-  { name: "Analytics", path: "/admin/analytics", icon: BarChart3 },
+  { name: "Bookings", path: "/admin/FetchBooking", icon: BarChart3 },
   { name: "Communication", path: "/admin/AdminSupport", icon: MessageSquare },
   { name: "Settings", path: "/admin/settings", icon: Settings },
 ];

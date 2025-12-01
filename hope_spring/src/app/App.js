@@ -63,6 +63,7 @@ import MyOrders from "../features/user/pages/MyOrders";
 import PastSessions from "../features/user/pages/PastSessions";
 import Support from "../components/Pages/Support/UsersSupport";
 import AdminSupport from "../features/admin/pages/AdminSupport";
+import AdminBookings from "../features/admin/pages/AdminBookingFetch";
 
 export default function App() {
   const location = useLocation();
@@ -271,6 +272,15 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <Announcements />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/FetchBooking"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminBookings/>
               </ProtectedRoute>
             }
           />
