@@ -5,6 +5,7 @@ import axios from "axios";
 
 const PROGRAMS_API = "/api/programs";
 const CAL_SLOTS_API = "/api/cal/programs";
+const WAITLIST_API = "/api/waitlist";
 
 const normalize = (v) =>
   (v || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -65,9 +66,16 @@ const fmtMonthDay = (isoOrYmd) => {
   }
 };
 
-/* ---------- Program card (same spirit as Support Groups) ---------- */
+/* ---------- Program card (waitlist-aware) ---------- */
 
-const ProgramCard = ({ p, linked, onRegister, calDates = [] }) => {
+const ProgramCard = ({
+  p,
+  linked,
+  onRegister,
+  calDates = [],
+  isFull = false,
+  onJoinWaitlist,
+}) => {
   const occs = p.occurrences || [];
 
   const hasCalDates = calDates && calDates.length > 0;
@@ -103,7 +111,9 @@ const ProgramCard = ({ p, linked, onRegister, calDates = [] }) => {
       {(hasCalDates || occs.length > 0) && (
         <div className="mt-3 flex flex-wrap gap-2">
           {hasCalDates
-            ? showCalDates.map((d) => <DatePill key={d}>{fmtMonthDay(d)}</DatePill>)
+            ? showCalDates.map((d) => (
+                <DatePill key={d}>{fmtMonthDay(d)}</DatePill>
+              ))
             : showOccs.map((o) => (
                 <DatePill key={o.id}>{fmtMonthDay(o.starts_at)}</DatePill>
               ))}
@@ -111,6 +121,7 @@ const ProgramCard = ({ p, linked, onRegister, calDates = [] }) => {
         </div>
       )}
 
+      {/* CTA logic */}
       {!linked ? (
         <button
           type="button"
@@ -118,6 +129,14 @@ const ProgramCard = ({ p, linked, onRegister, calDates = [] }) => {
           className="mt-4 inline-block rounded-lg bg-gray-200 text-gray-600 px-4 py-2 text-sm font-semibold cursor-not-allowed"
         >
           Not yet open
+        </button>
+      ) : isFull ? (
+        <button
+          type="button"
+          onClick={() => onJoinWaitlist && onJoinWaitlist(p)}
+          className="mt-4 inline-block rounded-lg bg-amber-600 text-white px-4 py-2 text-sm font-semibold hover:bg-amber-700"
+        >
+          Join waitlist
         </button>
       ) : (
         <button
@@ -283,7 +302,7 @@ export default function ProgramTemplate({ config }) {
     load();
   }, [categoryName, subcategoryName]);
 
-  /* ---- load Cal slots for each program (same idea as Support Groups) ---- */
+  /* ---- load Cal slots for each program ---- */
   useEffect(() => {
     if (!programs || programs.length === 0) return;
 
@@ -347,10 +366,38 @@ export default function ProgramTemplate({ config }) {
     setSelectedProgram(null);
   };
 
+  const joinWaitlistFor = async (p) => {
+    try {
+      if (!p?.id) return;
+
+      const body = {
+        programId: p.id,
+        memberId: loggedInUser?.id || null,
+        name: loggedInUser?.name || null,
+        email: loggedInUser?.email || null,
+      };
+
+      const res = await axios.post(`${WAITLIST_API}/join`, body);
+      const data = res.data || {};
+
+      if (data.existing) {
+        window.alert("You are already on the waitlist for this program.");
+      } else {
+        window.alert("You have been added to the waitlist for this program.");
+      }
+    } catch (err) {
+      console.error("Waitlist join failed:", err);
+      window.alert("Sorry, we could not add you to the waitlist right now.");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      {/* Hero – you keep your meditation/yoga images here */}
-      <section className="relative overflow-hidden" aria-labelledby="program-title">
+      {/* Hero */}
+      <section
+        className="relative overflow-hidden"
+        aria-labelledby="program-title"
+      >
         {heroImage && (
           <img
             src={heroImage}
@@ -459,7 +506,7 @@ export default function ProgramTemplate({ config }) {
         </section>
       )}
 
-      {/* PROGRAM CARDS – SAME STYLE AS SUPPORT GROUPS */}
+      {/* PROGRAM CARDS */}
       <section
         id="programs"
         className="max-w-6xl mx-auto px-4 py-10 scroll-mt-24"
@@ -485,6 +532,7 @@ export default function ProgramTemplate({ config }) {
             )}
 
             <div className="grid md:grid-cols-2 gap-6 mt-6">
+              {/* LEFT COLUMN */}
               <div className="space-y-4">
                 {leftPrograms.map((p) => {
                   const linked = !!(
@@ -496,6 +544,11 @@ export default function ProgramTemplate({ config }) {
                     dates: [],
                     slots: [],
                   };
+
+                  const maxCap = Number(p.max_capacity);
+                  const participants = Number(p.participants || 0);
+                  const isFull = maxCap > 0 && participants >= maxCap;
+
                   return (
                     <ProgramCard
                       key={p.id}
@@ -503,11 +556,14 @@ export default function ProgramTemplate({ config }) {
                       linked={linked}
                       onRegister={openBookingFor}
                       calDates={calInfo.dates}
+                      isFull={isFull}
+                      onJoinWaitlist={joinWaitlistFor}
                     />
                   );
                 })}
               </div>
 
+              {/* RIGHT COLUMN */}
               <div className="space-y-4">
                 {rightPrograms.map((p) => {
                   const linked = !!(
@@ -519,6 +575,11 @@ export default function ProgramTemplate({ config }) {
                     dates: [],
                     slots: [],
                   };
+
+                  const maxCap = Number(p.max_capacity);
+                  const participants = Number(p.participants || 0);
+                  const isFull = maxCap > 0 && participants >= maxCap;
+
                   return (
                     <ProgramCard
                       key={p.id}
@@ -526,6 +587,8 @@ export default function ProgramTemplate({ config }) {
                       linked={linked}
                       onRegister={openBookingFor}
                       calDates={calInfo.dates}
+                      isFull={isFull}
+                      onJoinWaitlist={joinWaitlistFor}
                     />
                   );
                 })}
@@ -535,15 +598,14 @@ export default function ProgramTemplate({ config }) {
         )}
       </section>
 
-      {/* Partner programs (unchanged) */}
+      {/* Partner programs */}
       {partnerPrograms.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-10">
           <SectionTitle
             title="Offered by community partners"
             kicker="Additional options"
           />
-          {/* you can keep your old accordion here if you like, or simple list */}
-          {/* ... */}
+          {/* Keep your existing UI here if you have one */}
         </section>
       )}
 
@@ -558,13 +620,15 @@ export default function ProgramTemplate({ config }) {
             />
           )}
           <div>
-            <h3 className="text-2xl font-semibold">Frequently Asked Questions</h3>
-            {/* keep your previous Accordion here if you want */}
+            <h3 className="text-2xl font-semibold">
+              Frequently Asked Questions
+            </h3>
+            {/* Add your Accordion here if you had one */}
           </div>
         </section>
       )}
 
-      {/* Related programs – unchanged */}
+      {/* Related programs */}
       {relatedPrograms.length > 0 && (
         <section className="bg-amber-500/10 py-14">
           <div className="mx-auto max-w-6xl px-4">
