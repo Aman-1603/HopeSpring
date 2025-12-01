@@ -1,159 +1,189 @@
-// hope_spring/backend/routes/calWebhookRoutes.js
+// backend/routes/calWebhookRoutes.js
+
 import express from "express";
 import { pool } from "../db.js";
 
 const router = express.Router();
 
-// IMPORTANT: server.js must mount this router with express.raw({ type: "application/json" })
+
 
 router.post("/", async (req, res) => {
+  let rawBody = req.body;
+
   try {
-    const rawBody =
-      req.body instanceof Buffer ? req.body.toString("utf8") : req.body;
-    const payload = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
+    const json =
+      rawBody instanceof Buffer ? JSON.parse(rawBody.toString("utf8")) : rawBody;
 
-    // Cal sometimes wraps in { triggerEvent, createdAt, payload: { ...actual booking... } }
-    const root = payload?.data || payload;
-    const data = root?.payload || root;
+    const trigger = json?.triggerEvent;
+    const payload = json?.payload;
 
-    if (!data) {
-      console.warn("[Cal webhook] No data in payload", payload);
-      return res.status(400).json({ error: "No data" });
+    if (!trigger || !payload) {
+      console.warn("Webhook received without trigger/payload:", json);
+      return res.status(200).end();
     }
 
-    // 🔹 Handle Cal "Ping test" payloads gracefully (no booking id, type === "Test")
-    if (data.type === "Test" || payload.type === "Test") {
-      console.log("[Cal webhook] Received test ping from Cal — acknowledging OK.");
-      return res.json({ ok: true, test: true });
+    console.log(`webhook: ${trigger}`);
+
+    switch (trigger) {
+      case "BOOKING_CREATED":
+        await handleBookingCreated(payload);
+        break;
+
+      case "BOOKING_CANCELLED":
+        await handleBookingCancelled(payload);
+        break;
+
+      case "BOOKING_REJECTED":
+        await handleBookingRejected(payload);
+        break;
+
+      default:
+        console.log("Ignored webhook trigger:", trigger);
+        break;
     }
 
-    // booking id / uid
-    const calBookingId =
-      data.id || data.uid || data.bookingId || data.bookingID || null;
-
-    if (!calBookingId) {
-      console.warn("[Cal webhook] No booking id in payload", data);
-      return res.status(400).json({ error: "No booking id" });
-    }
-
-    // event type id
-    const calEventTypeId =
-      data.eventTypeId ||
-      data.eventType_id ||
-      data.eventType?.id ||
-      null;
-
-    // times
-    const startTime =
-      data.startTime || data.startsAt || data.start || data.start_time || null;
-    const endTime =
-      data.endTime || data.endsAt || data.end || data.end_time || null;
-
-    // status
-    const status = data.status || "confirmed";
-
-    // attendee info 
-    const primary =
-      data.attendee ||
-      (Array.isArray(data.attendees) ? data.attendees[0] : null) ||
-      {};
-
-    const attendeeName =
-      data.name ||
-      primary.name ||
-      data.responses?.name?.value ||
-      null;
-
-    const attendeeEmail =
-      data.email ||
-      primary.email ||
-      data.responses?.email?.value ||
-      null;
-
-    // ---------- metadata: HopeSpring user id ----------
-    const metadata = data.metadata || data.meta || {};
-
-    let userId = null;
-
-    const metaUserId =
-      metadata.userId ||
-      metadata.hsUserId ||
-      metadata.hs_user_id ||
-      null;
-
-    if (metaUserId != null) {
-      const parsed = parseInt(String(metaUserId), 10);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        userId = parsed;
-      }
-    }
-
-    // Fallback: infer user from attendee email if userId still unknown
-    if (!userId && attendeeEmail) {
-      const { rows } = await pool.query(
-        "SELECT id FROM users WHERE email = $1 LIMIT 1",
-        [attendeeEmail]
-      );
-      userId = rows[0]?.id || null;
-    }
-
-    // Map Cal eventTypeId -> programs.id
-    let programId = null;
-    if (calEventTypeId) {
-      const { rows } = await pool.query(
-        "SELECT id FROM programs WHERE cal_event_type_id = $1 LIMIT 1",
-        [calEventTypeId]
-      );
-      programId = rows[0]?.id || null;
-    }
-
-    await pool.query(
-      `
-      INSERT INTO bookings (
-        program_id,
-        user_id,
-        cal_booking_id,
-        attendee_name,
-        attendee_email,
-        status,
-        event_start,
-        event_end,
-        cal_event_type_id,
-        raw,
-        created_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-      ON CONFLICT (cal_booking_id)
-      DO UPDATE SET
-        program_id        = COALESCE(EXCLUDED.program_id, bookings.program_id),
-        user_id           = COALESCE(EXCLUDED.user_id, bookings.user_id),
-        attendee_name     = EXCLUDED.attendee_name,
-        attendee_email    = EXCLUDED.attendee_email,
-        status            = EXCLUDED.status,
-        event_start       = EXCLUDED.event_start,
-        event_end         = EXCLUDED.event_end,
-        cal_event_type_id = COALESCE(EXCLUDED.cal_event_type_id, bookings.cal_event_type_id),
-        raw               = EXCLUDED.raw
-      `,
-      [
-        programId,
-        userId,
-        calBookingId,
-        attendeeName,
-        attendeeEmail,
-        status,
-        startTime,
-        endTime,
-        calEventTypeId,
-        payload, // 🔹 store full original payload, not just `data`
-      ]
-    );
-
-    return res.json({ ok: true });
+    return res.status(200).json({ ok: true });
   } catch (err) {
-    console.error("[Cal webhook] error:", err);
-    return res.status(500).json({ error: "server error" });
+    console.error(" Webhook error:", err);
+    return res.status(200).json({ ok: false });
   }
 });
+
+/* ============================================================
+   HELPERS — LOAD PROGRAM BY eventTypeId or slug
+============================================================ */
+
+async function findProgramForWebhook(payload) {
+  const eventTypeId =
+    payload?.eventTypeId ||
+    payload?.event_type_id ||
+    payload?.event_type ||
+    null;
+
+  if (eventTypeId) {
+    const r1 = await pool.query(
+      `SELECT id FROM programs WHERE cal_event_type_id = $1 LIMIT 1`,
+      [eventTypeId]
+    );
+    if (r1.rows.length > 0) return r1.rows[0].id;
+  }
+
+  // fallback to slug-based
+  const slug =
+    payload?.type ||
+    payload?.slug ||
+    payload?.eventType ||
+    payload?.event_type ||
+    null;
+
+  if (slug) {
+    const r2 = await pool.query(
+      `SELECT id FROM programs WHERE cal_slug = $1 LIMIT 1`,
+      [slug]
+    );
+    if (r2.rows.length > 0) return r2.rows[0].id;
+  }
+
+  console.warn("Could not map webhook payload to a program:", {
+    eventTypeId,
+    slug,
+  });
+
+  return null;
+}
+
+/* ============================================================
+   BOOKING_CREATED
+============================================================ */
+
+async function handleBookingCreated(payload) {
+  const uid = payload?.uid;
+  if (!uid) return;
+
+  const programId = await findProgramForWebhook(payload);
+  if (!programId) {
+    console.warn("BOOKING_CREATED: program not found, skipping:", uid);
+    return;
+  }
+
+  const attendees = payload.attendees || [];
+  const first = attendees[0] || {};
+  const name = first.name || null;
+  const email = first.email || null;
+
+  const start = payload.startTime || null;
+  const end = payload.endTime || null;
+
+  await pool.query(
+    `
+    INSERT INTO bookings (
+      program_id,
+      cal_booking_id,
+      event_start,
+      event_end,
+      attendee_name,
+      attendee_email,
+      status,
+      raw,
+      created_at
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,'ACCEPTED',$7,NOW())
+    ON CONFLICT (cal_booking_id)
+    DO UPDATE SET
+      program_id = EXCLUDED.program_id,
+      event_start = EXCLUDED.event_start,
+      event_end = EXCLUDED.event_end,
+      attendee_name = EXCLUDED.attendee_name,
+      attendee_email = EXCLUDED.attendee_email,
+      status = 'ACCEPTED',
+      raw = EXCLUDED.raw
+    `,
+    [programId, uid, start, end, name, email, payload]
+  );
+
+  console.log("BOOKING_CREATED synced:", uid);
+}
+
+/* ============================================================
+   BOOKING_CANCELLED
+============================================================ */
+
+async function handleBookingCancelled(payload) {
+  const uid = payload?.uid;
+  if (!uid) return;
+
+  await pool.query(
+    `
+    UPDATE bookings
+    SET status = 'CANCELLED',
+        raw = $2
+    WHERE cal_booking_id = $1
+    `,
+    [uid, payload]
+  );
+
+  console.log("BOOKING_CANCELLED synced:", uid);
+}
+
+/* ============================================================
+   BOOKING_REJECTED
+============================================================ */
+
+async function handleBookingRejected(payload) {
+  const uid = payload?.uid;
+  if (!uid) return;
+
+  await pool.query(
+    `
+    UPDATE bookings
+    SET status = 'REJECTED',
+        raw = $2
+    WHERE cal_booking_id = $1
+    `,
+    [uid, payload]
+  );
+
+  console.log("BOOKING_REJECTED synced:", uid);
+}
 
 export default router;

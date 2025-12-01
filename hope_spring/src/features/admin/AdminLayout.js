@@ -15,6 +15,7 @@ import {
   BarChart3,
   MessageSquare,
   Settings,
+  ListChecks
 } from "lucide-react";
 
 const adminNavItems = [
@@ -27,6 +28,7 @@ const adminNavItems = [
   { name: "Event Calendar", path: "/admin/EventCalendar", icon: CalendarDays },
   { name: "Bookings", path: "/admin/FetchBooking", icon: BarChart3 },
   { name: "Communication", path: "/admin/AdminSupport", icon: MessageSquare },
+  { name: "Waitlist", path: "/admin/waitlist", icon: ListChecks },
   { name: "Settings", path: "/admin/settings", icon: Settings },
 ];
 

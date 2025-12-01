@@ -5,38 +5,32 @@ const CAL_BASE = "https://api.cal.com/v2";
 const CAL_VERSION = "2024-06-14";
 
 /* ============================================
-   Load API key lazily (dotenv loads before use)
+   ENV + BASE CLIENT
 ============================================ */
-function getApiKey() {
-  const key = process.env.CAL_API_KEY;
-  if (!key) throw new Error("Missing env var: CAL_API_KEY");
-  return key.trim();
+
+function requireEnv(name) {
+  const val = process.env[name];
+  if (!val) throw new Error(`Missing env var: ${name}`);
+  return val.trim();
 }
 
-function makeCal() {
-  const key = getApiKey();
-  const authHeader = key.startsWith("Bearer ") ? key : `Bearer ${key}`;
+const CAL_API_KEY = requireEnv("CAL_API_KEY");
 
-  return axios.create({
-    baseURL: CAL_BASE,
-    headers: {
-      Authorization: authHeader,
-      "Content-Type": "application/json",
-      "cal-api-version": CAL_VERSION,
-    },
-    timeout: 20000,
-  });
-}
+export const cal = axios.create({
+  baseURL: CAL_BASE,
+  headers: {
+    Authorization: CAL_API_KEY.startsWith("Bearer ")
+      ? CAL_API_KEY
+      : `Bearer ${CAL_API_KEY}`,
+    "Content-Type": "application/json",
+    "cal-api-version": CAL_VERSION,
+  },
+  timeout: 20000,
+});
 
 /* ============================================
-   RAW CLIENT PROXY (lazy)
+   LOW-LEVEL HELPERS
 ============================================ */
-export const cal = {
-  get: (path, config) => makeCal().get(path, config),
-  post: (path, data, config) => makeCal().post(path, data, config),
-  patch: (path, data, config) => makeCal().patch(path, data, config),
-  delete: (path, config) => makeCal().delete(path, config),
-};
 
 function unwrap(res) {
   return res?.data?.data ?? res?.data ?? null;
@@ -46,17 +40,23 @@ function toApiMsg(err) {
   const d = err?.response?.data;
   if (!d) return err.message || "Unknown Cal error";
   if (typeof d === "string") return d;
-  if (d.message)
+  if (d.message) {
     return typeof d.message === "string"
       ? d.message
       : JSON.stringify(d.message);
+  }
   if (d.error?.message) return d.error.message;
-  return JSON.stringify(d);
+  try {
+    return JSON.stringify(d);
+  } catch {
+    return err.message || "Unknown Cal error";
+  }
 }
 
-async function calGet(path) {
+async function calGet(path, config) {
   try {
-    return unwrap(await makeCal().get(path));
+    const res = await cal.get(path, config);
+    return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
     console.error("❌ Cal GET failed:", path, msg);
@@ -64,9 +64,10 @@ async function calGet(path) {
   }
 }
 
-async function calPost(path, payload) {
+async function calPost(path, payload, config) {
   try {
-    return unwrap(await makeCal().post(path, payload));
+    const res = await cal.post(path, payload, config);
+    return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
     console.error("❌ Cal POST failed:", path, msg, payload);
@@ -74,9 +75,10 @@ async function calPost(path, payload) {
   }
 }
 
-async function calPatch(path, payload) {
+async function calPatch(path, payload, config) {
   try {
-    return unwrap(await makeCal().patch(path, payload));
+    const res = await cal.patch(path, payload, config);
+    return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
     console.error("❌ Cal PATCH failed:", path, msg, payload);
@@ -87,114 +89,154 @@ async function calPatch(path, payload) {
 /* ============================================
    SCHEDULES
 ============================================ */
-export async function createSchedule({
-  name,
-  timeZone = "America/New_York",
-  availability = [],
-  overrides = [],
-  isDefault = false,
-}) {
-  const payload = { name, timeZone, availability, overrides, isDefault };
+
+
+export async function createSchedule(input) {
+  const {
+    name,
+    timeZone = "America/New_York",
+    availability = [],
+    ...rest
+  } = input || {};
+
+  if (!name) throw new Error("createSchedule: name is required");
+
+  const payload = {
+    name,
+    timeZone,
+    availability,
+    ...rest,
+  };
+
   return calPost("/schedules", payload);
 }
 
-export async function updateSchedule(scheduleId, patch = {}) {
-  if (!scheduleId) throw new Error("updateSchedule: scheduleId required");
-
-  const payload = {};
-
-  if (patch.name !== undefined) payload.name = patch.name;
-  if (patch.timeZone !== undefined) payload.timeZone = patch.timeZone;
-
-  if (patch.availability !== undefined && Array.isArray(patch.availability)) {
-    payload.availability = patch.availability;
-  }
-
-  if (patch.overrides !== undefined && Array.isArray(patch.overrides)) {
-    payload.overrides = patch.overrides;
-  }
-
-  if (patch.isDefault !== undefined && typeof patch.isDefault === "boolean") {
-    payload.isDefault = patch.isDefault;
-  }
-
+/**
+ * Update a schedule in Cal.
+ */
+export async function updateSchedule(scheduleId, input) {
+  if (!scheduleId) throw new Error("updateSchedule: scheduleId is required");
+  const payload = { ...(input || {}) };
   return calPatch(`/schedules/${scheduleId}`, payload);
 }
 
 /* ============================================
    EVENT TYPES
 ============================================ */
-/**
- * We forward *any* extra fields (like seatsPerTimeSlot,
- * seatsShowAttendees, seatsShowAvailabilityCount, etc.)
- * straight through to Cal.
- */
+
+
 export async function createEventType(input) {
+  if (!input) throw new Error("createEventType: input is required");
+
   const {
     title,
     slug,
-    description = "",
     lengthInMinutes = 60,
-    host,
-    metadata = {},
+    description,
     scheduleId,
+    locations,
+    seats,
     bookingWindow,
-    ...rest // <- seatsPerTimeSlot, seatsShowAttendees, etc.
+    ...rest
   } = input;
+
+  if (!title) throw new Error("createEventType: title is required");
+  if (!scheduleId) throw new Error("createEventType: scheduleId is required");
 
   const payload = {
     title,
     slug,
-    description,
     lengthInMinutes,
-    metadata,
+    description,
+    scheduleId,
+    locations,
+    seats,
+    bookingWindow,
     ...rest,
   };
-
-  if (host !== undefined) payload.host = host;
-  if (scheduleId !== undefined) payload.scheduleId = scheduleId;
-  if (bookingWindow !== undefined) payload.bookingWindow = bookingWindow;
 
   return calPost("/event-types", payload);
 }
 
-export async function updateEventType(eventTypeId, patch = {}) {
-  if (!eventTypeId) throw new Error("updateEventType: eventTypeId required");
+/**
+ * Update an existing event type.
+ */
+export async function updateEventType(eventTypeId, input) {
+  if (!eventTypeId) throw new Error("updateEventType: eventTypeId is required");
 
   const {
     title,
     slug,
-    description,
     lengthInMinutes,
-    host,
+    description,
     scheduleId,
-    metadata,
+    locations,
+    seats,
     bookingWindow,
-    ...rest // again: seatsPerTimeSlot, seatsShowAttendees, etc.
-  } = patch;
+    ...rest
+  } = input || {};
 
-  const payload = { ...rest };
+  const payload = {};
 
   if (title !== undefined) payload.title = title;
   if (slug !== undefined) payload.slug = slug;
+  if (lengthInMinutes !== undefined) payload.lengthInMinutes = lengthInMinutes;
   if (description !== undefined) payload.description = description;
-  if (lengthInMinutes !== undefined)
-    payload.lengthInMinutes = lengthInMinutes;
-  if (host !== undefined) payload.host = host;
   if (scheduleId !== undefined) payload.scheduleId = scheduleId;
-  if (metadata !== undefined) payload.metadata = metadata;
+  if (locations !== undefined) payload.locations = locations;
+  if (seats !== undefined) payload.seats = seats;
   if (bookingWindow !== undefined) payload.bookingWindow = bookingWindow;
+
+  Object.assign(payload, rest);
 
   return calPatch(`/event-types/${eventTypeId}`, payload);
 }
 
 /* ============================================
-   DEBUG HELPERS
+   BOOKINGS
 ============================================ */
+
+
+export async function createBooking({
+  eventTypeId,
+  startTime,
+  endTime,
+  name,
+  email,
+  timeZone = "America/New_York",
+  metadata = {},
+}) {
+  if (!eventTypeId) throw new Error("createBooking: eventTypeId is required");
+  if (!startTime) throw new Error("createBooking: startTime is required");
+  if (!email) throw new Error("createBooking: attendee email is required");
+
+  const payload = {
+    eventTypeId,
+    start: startTime,
+    end: endTime || null,
+    timeZone,
+    attendees: [
+      {
+        name: name || null,
+        email,
+      },
+    ],
+    metadata,
+  };
+
+  return calPost("/bookings", payload);
+}
+
+/* ============================================
+   DEBUG / FETCH HELPERS
+============================================ */
+
 export async function getSchedule(scheduleId) {
+  if (!scheduleId) throw new Error("getSchedule: scheduleId is required");
   return calGet(`/schedules/${scheduleId}`);
 }
 
 export async function getEventType(eventTypeId) {
+  if (!eventTypeId) throw new Error("getEventType: eventTypeId is required");
   return calGet(`/event-types/${eventTypeId}`);
 }
