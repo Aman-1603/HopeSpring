@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import UserHeader from "../components/UserHeader";
 import MyPrograms from "../components/MyPrograms";
 import AnnouncementsFeed from "../components/AnnouncementsFeed";
@@ -10,9 +10,17 @@ import { useAuth } from "../../../contexts/AuthContext";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
-  const user = { name: "Guest User" };
+  useEffect(() => {
+    if(!user) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
+
+  console.log("UserDashboard rendered with user:", user);
+
+  
 
   const [programs, setPrograms] = useState([
     {
@@ -158,7 +166,7 @@ const UserDashboard = () => {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <UserHeader
-            name={user.name}
+            name={user.fullName}
             onBook={handleBookProgram}
             onLogout={handleLogout}
           />
