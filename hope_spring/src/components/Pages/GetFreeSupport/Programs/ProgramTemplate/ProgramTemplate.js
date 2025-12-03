@@ -1,4 +1,4 @@
-// ProgramTemplate.js
+// src/components/Pages/GetFreeSupport/Programs/ProgramTemplate/ProgramTemplate.js
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -6,6 +6,7 @@ import axios from "axios";
 const PROGRAMS_API = "/api/programs";
 const CAL_SLOTS_API = "/api/cal/programs";
 const WAITLIST_API = "/api/waitlist";
+const BOOKINGS_SUMMARY_API = "/api/bookings/programs";
 
 const normalize = (v) =>
   (v || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -65,6 +66,56 @@ const fmtMonthDay = (isoOrYmd) => {
     return isoOrYmd;
   }
 };
+
+// try to detect if a Cal slot still has seats
+function slotHasFreeSeat(slot) {
+  if (!slot) return false;
+
+  // common seat fields from Cal /v2/slots – we don't trust names, so we check a few
+  const n =
+    slot.seatsAvailable ??
+    slot.availableSeats ??
+    slot.seats_remaining ??
+    slot.remainingSeats ??
+    null;
+
+  if (typeof n === "number") return n > 0;
+
+  if (typeof slot.isSeatAvailable === "boolean") return slot.isSeatAvailable;
+  if (typeof slot.isAvailable === "boolean") return slot.isAvailable;
+
+  // if we can't tell, assume it's available (safer: we *won't* wrongly block registration)
+  return true;
+}
+
+// centralised "is this program full?" logic
+function computeIsFull({ linked, program, summary, calSlots }) {
+  if (!linked) return false;
+
+  const capacityFromProg =
+    program.max_capacity != null ? Number(program.max_capacity) : null;
+  const participantsFromProg =
+    program.participants != null ? Number(program.participants) : 0;
+
+  const capacity = summary?.capacity ?? capacityFromProg;
+  const bookedCount = summary?.bookedCount ?? participantsFromProg;
+  const freeSeatsFromSummary =
+    summary?.freeSeats ??
+    (capacity != null ? Math.max(capacity - bookedCount, 0) : null);
+
+  // ✅ DB is the single source of truth when capacity exists
+  if (capacity != null) {
+    // treat <= 0 as full (overbooked should still show "full")
+    return freeSeatsFromSummary <= 0;
+  }
+
+  // ❓ No capacity configured → fall back to Cal slots only
+  const slots = calSlots || [];
+  if (slots.length === 0) return false;
+
+  const hasAnyFreeSlot = slots.some(slotHasFreeSeat);
+  return !hasAnyFreeSlot;
+}
 
 /* ---------- Program card (waitlist-aware) ---------- */
 
@@ -244,8 +295,10 @@ export default function ProgramTemplate({ config }) {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState(null);
 
-  const [slotDatesByProgram, setSlotDatesByProgram] = useState({});
+  const [slotInfoByProgram, setSlotInfoByProgram] = useState({});
   const [slotsLoading, setSlotsLoading] = useState(false);
+
+  const [summaryByProgram, setSummaryByProgram] = useState({});
 
   /* ---- logged-in user ---- */
   useEffect(() => {
@@ -319,7 +372,10 @@ export default function ProgramTemplate({ config }) {
             try {
               const res = await axios.get(`${CAL_SLOTS_API}/${p.id}/slots`);
               const data = res.data || {};
-              return [p.id, { dates: data.dates || [], slots: data.slots || [] }];
+              return [
+                p.id,
+                { dates: data.dates || [], slots: data.slots || [] },
+              ];
             } catch (err) {
               console.error("slots fetch failed for program", p.id, err);
               return [p.id, { dates: [], slots: [] }];
@@ -333,13 +389,54 @@ export default function ProgramTemplate({ config }) {
         for (const [id, info] of results) {
           map[id] = info;
         }
-        setSlotDatesByProgram(map);
+        setSlotInfoByProgram(map);
       } finally {
         if (!cancelled) setSlotsLoading(false);
       }
     }
 
     loadSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [programs]);
+
+  /* ---- load bookings summary for each program ---- */
+  useEffect(() => {
+    if (!programs || programs.length === 0) return;
+
+    let cancelled = false;
+
+    async function loadSummaries() {
+      try {
+        const results = await Promise.all(
+          programs.map(async (p) => {
+            try {
+              const res = await axios.get(
+                `${BOOKINGS_SUMMARY_API}/${p.id}/summary`
+              );
+              console.log("Summary for program", p.id, res.data);
+              return [p.id, res.data];
+            } catch (err) {
+              console.error("summary fetch failed for program", p.id, err);
+              return [p.id, null];
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        const map = {};
+        for (const [id, summary] of results) {
+          map[id] = summary;
+        }
+        setSummaryByProgram(map);
+      } catch (err) {
+        console.error("Error loading summaries:", err);
+      }
+    }
+
+    loadSummaries();
     return () => {
       cancelled = true;
     };
@@ -540,14 +637,18 @@ export default function ProgramTemplate({ config }) {
                     p.cal_slug &&
                     p.cal_event_type_id
                   );
-                  const calInfo = slotDatesByProgram[p.id] || {
+                  const slotInfo = slotInfoByProgram[p.id] || {
                     dates: [],
                     slots: [],
                   };
+                  const summary = summaryByProgram[p.id] || null;
 
-                  const maxCap = Number(p.max_capacity);
-                  const participants = Number(p.participants || 0);
-                  const isFull = maxCap > 0 && participants >= maxCap;
+                  const isFull = computeIsFull({
+                    linked,
+                    program: p,
+                    summary,
+                    calSlots: slotInfo.slots,
+                  });
 
                   return (
                     <ProgramCard
@@ -555,7 +656,7 @@ export default function ProgramTemplate({ config }) {
                       p={p}
                       linked={linked}
                       onRegister={openBookingFor}
-                      calDates={calInfo.dates}
+                      calDates={slotInfo.dates}
                       isFull={isFull}
                       onJoinWaitlist={joinWaitlistFor}
                     />
@@ -571,14 +672,18 @@ export default function ProgramTemplate({ config }) {
                     p.cal_slug &&
                     p.cal_event_type_id
                   );
-                  const calInfo = slotDatesByProgram[p.id] || {
+                  const slotInfo = slotInfoByProgram[p.id] || {
                     dates: [],
                     slots: [],
                   };
+                  const summary = summaryByProgram[p.id] || null;
 
-                  const maxCap = Number(p.max_capacity);
-                  const participants = Number(p.participants || 0);
-                  const isFull = maxCap > 0 && participants >= maxCap;
+                  const isFull = computeIsFull({
+                    linked,
+                    program: p,
+                    summary,
+                    calSlots: slotInfo.slots,
+                  });
 
                   return (
                     <ProgramCard
@@ -586,7 +691,7 @@ export default function ProgramTemplate({ config }) {
                       p={p}
                       linked={linked}
                       onRegister={openBookingFor}
-                      calDates={calInfo.dates}
+                      calDates={slotInfo.dates}
                       isFull={isFull}
                       onJoinWaitlist={joinWaitlistFor}
                     />
@@ -605,7 +710,6 @@ export default function ProgramTemplate({ config }) {
             title="Offered by community partners"
             kicker="Additional options"
           />
-          {/* Keep your existing UI here if you have one */}
         </section>
       )}
 
@@ -623,7 +727,6 @@ export default function ProgramTemplate({ config }) {
             <h3 className="text-2xl font-semibold">
               Frequently Asked Questions
             </h3>
-            {/* Add your Accordion here if you had one */}
           </div>
         </section>
       )}

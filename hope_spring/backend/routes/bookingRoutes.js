@@ -1,37 +1,57 @@
 // backend/routes/bookingRoutes.js
-
 import express from "express";
 import { pool } from "../db.js";
 
 const router = express.Router();
 
-
+/* ------------------------------------------
+   Normalizer for Cal booking payloads
+-------------------------------------------*/
 export function normalizeCalBooking(calPayload) {
   if (!calPayload) return null;
 
   const {
     uid,
+    id,
+    bookingId,
     startTime,
     endTime,
+    start,
+    end,
     attendees = [],
     metadata = {},
+    status,
   } = calPayload;
 
   const first = attendees[0] || {};
+
+  // how many seats does this booking use?
+  const seatCountRaw =
+    (Array.isArray(attendees) && attendees.length) ||
+    calPayload.seats ||
+    calPayload.seatCount ||
+    null;
+
+  const seat_count =
+    typeof seatCountRaw === "number" && seatCountRaw > 0
+      ? seatCountRaw
+      : 1;
+
   return {
-    cal_booking_id: uid || null,
-    event_start: startTime || null,
-    event_end: endTime || null,
+    cal_booking_id: uid || id || bookingId || null,
+    event_start: startTime || start || null,
+    event_end: endTime || end || null,
     attendee_name: first.name || null,
     attendee_email: first.email || null,
-    user_id: metadata.userId || null,
+    user_id: metadata.userId || metadata.memberId || null,
+    seat_count,
+    status: status || "ACCEPTED",
     raw: calPayload,
   };
 }
 
 /* ============================================================
-   GET /api/bookings
-   Admin view — all bookings
+   GET /api/bookings          (Admin: all bookings)
 ============================================================ */
 router.get("/", async (req, res) => {
   try {
@@ -39,7 +59,7 @@ router.get("/", async (req, res) => {
       `
       SELECT
         b.*,
-        p.title AS program_title,
+        p.title   AS program_title,
         p.category AS program_category
       FROM bookings b
       LEFT JOIN programs p ON p.id = b.program_id
@@ -55,8 +75,7 @@ router.get("/", async (req, res) => {
 });
 
 /* ============================================================
-   GET /api/bookings/user/:userId
-   User dashboard — their bookings
+   GET /api/bookings/user/:userId   (Member: their bookings)
 ============================================================ */
 router.get("/user/:userId", async (req, res) => {
   try {
@@ -69,7 +88,7 @@ router.get("/user/:userId", async (req, res) => {
       `
       SELECT
         b.*,
-        p.title AS program_title,
+        p.title   AS program_title,
         p.category AS program_category
       FROM bookings b
       LEFT JOIN programs p ON p.id = b.program_id
@@ -88,7 +107,7 @@ router.get("/user/:userId", async (req, res) => {
 
 /* ============================================================
    POST /api/bookings/programs/:id/sync
-   Maintains bookings list integrity (cleanup logic)
+   (stub for future cleanup logic)
 ============================================================ */
 router.post("/programs/:id/sync", async (req, res) => {
   try {
@@ -97,30 +116,11 @@ router.post("/programs/:id/sync", async (req, res) => {
       return res.status(400).json({ error: "Invalid program id" });
     }
 
-    const { rows: existing } = await pool.query(
-      `
-      SELECT id, cal_booking_id
-      FROM bookings
-      WHERE program_id = $1
-      `,
-      [pid]
-    );
-
-    const removed = [];
-    for (const b of existing) {
-      if (!b.cal_booking_id) continue;
-
-      const inCalStillExists = true; // Stub — keep existing logic
-      if (!inCalStillExists) {
-        removed.push(b.id);
-        await pool.query(`DELETE FROM bookings WHERE id = $1`, [b.id]);
-      }
-    }
-
+    // right now we don't actually delete anything – placeholder
     return res.json({
       ok: true,
-      removed,
-      message: "Sync completed",
+      removed: [],
+      message: "Sync completed (no-op placeholder)",
     });
   } catch (err) {
     console.error("❌ Program sync failed:", err);
@@ -130,12 +130,15 @@ router.post("/programs/:id/sync", async (req, res) => {
 
 /* ============================================================
    GET /api/bookings/programs/:id/summary
-   For Admin Waitlist page
+   Used by:
+     - ProgramTemplate (to show Join waitlist)
+     - AdminWaitlist dashboard
+
    Returns:
-     capacity
-     bookedCount (future ACCEPTED/CONFIRMED/BOOKED)
-     freeSeats
-     waitlistWaiting
+     capacity         (from programs.max_capacity)
+     bookedCount      (SUM of seat_count for future active bookings)
+     freeSeats        (capacity - bookedCount)
+     waitlistWaiting  (# of waitlist rows with status='waiting')
 ============================================================ */
 router.get("/programs/:id/summary", async (req, res) => {
   try {
@@ -164,10 +167,19 @@ router.get("/programs/:id/summary", async (req, res) => {
     const prog = progRes.rows[0];
     const nowIso = new Date().toISOString();
 
-    // Count future active bookings
+    // 🔥 IMPORTANT: use SUM(seat_count), not COUNT(*)
     const bookRes = await pool.query(
       `
-      SELECT COUNT(*) AS cnt
+      SELECT COALESCE(
+        SUM(
+          CASE
+            WHEN seat_count IS NOT NULL AND seat_count > 0
+              THEN seat_count
+            ELSE 1
+          END
+        ),
+        0
+      ) AS cnt
       FROM bookings
       WHERE program_id = $1
         AND (event_start IS NULL OR event_start >= $2)
@@ -178,7 +190,7 @@ router.get("/programs/:id/summary", async (req, res) => {
 
     const bookedCount = Number(bookRes.rows[0]?.cnt || 0);
 
-    // Count waiting waitlist entries
+    // Waitlist count
     const wlRes = await pool.query(
       `
       SELECT COUNT(*) AS cnt
