@@ -12,6 +12,9 @@ const UserDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+
+
+
   useEffect(() => {
     if(!user) {
       navigate("/login");
@@ -22,36 +25,58 @@ const UserDashboard = () => {
 
   
 
-  const [programs, setPrograms] = useState([
-    {
-      id: 1,
-      title: "Yoga & Meditation",
-      date: "2024-01-20",
-      time: "10:00 AM",
-      instructor: "Sarah Johnson",
-      location: "Room 101",
-      status: "upcoming",
-      zoomLink: "https://zoom.us/j/1234567890",
-    },
-    {
-      id: 2,
-      title: "Art Therapy Workshop",
-      date: "2024-01-22",
-      time: "2:00 PM",
-      instructor: "Michael Chen",
-      location: "Studio A",
-      status: "upcoming",
-    },
-    {
-      id: 3,
-      title: "Support Group Session",
-      date: "2024-01-18",
-      time: "6:00 PM",
-      instructor: "Dr. Emily Roberts",
-      location: "Conference Room",
-      status: "completed",
-    },
-  ]);
+  const [programs, setPrograms] = useState([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+
+  // 🔹 Fetch user bookings from backend
+useEffect(() => {
+  if (!user) return;
+
+  const fetchBookings = async () => {
+    try {
+      setLoadingPrograms(true);
+
+      const res = await fetch(`/api/bookings/user/${user.id}`, {
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem("hs_token")}`,
+  },
+});
+
+
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to fetch bookings");
+      }
+
+      // 🔁 Map backend rows into the format MyPrograms expects
+      const mapped = data.bookings.map((b) => {
+        const start = b.event_start ? new Date(b.event_start) : null;
+        return {
+          id: b.id,
+          title: b.program_title,
+          date: start ? start.toLocaleDateString() : "",
+          time: start
+            ? start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "",
+          instructor: b.instructor || "N/A",
+          location: b.location || "N/A",
+          status: b.status || "upcoming",
+        };
+      });
+
+      setPrograms(mapped);
+    } catch (err) {
+      console.error("Booking fetch error:", err);
+      toast.error("Failed to load your programs.");
+    } finally {
+      setLoadingPrograms(false);
+    }
+  };
+
+  fetchBookings();
+}, [user]);
+
 
   const [announcements] = useState([
     {
@@ -172,7 +197,7 @@ const UserDashboard = () => {
           />
 
           <div className="mt-8 space-y-8">
-            <MyPrograms programs={programs} />
+            <MyPrograms programs={programs} loadingPrograms={loadingPrograms} />
             <AnnouncementsFeed announcements={announcements} />
             <Recommendations
               recommendations={recommendations}
