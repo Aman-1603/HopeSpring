@@ -6,6 +6,11 @@ const router = express.Router();
 
 /* ------------------------------------------
    Normalizer for Cal booking payloads
+
+   IMPORTANT: Our model is now:
+     - 1 DB row in `bookings` = 1 participant = 1 seat
+   So seat_count is always 1 for new rows. We keep the field
+   only for legacy compatibility / analytics if needed.
 -------------------------------------------*/
 export function normalizeCalBooking(calPayload) {
   if (!calPayload) return null;
@@ -25,15 +30,10 @@ export function normalizeCalBooking(calPayload) {
 
   const first = attendees[0] || {};
 
-  // how many seats does this booking use?
-  const seatCountRaw =
-    (Array.isArray(attendees) && attendees.length) ||
-    calPayload.seats ||
-    calPayload.seatCount ||
-    null;
-
-  const seat_count =
-    typeof seatCountRaw === "number" && seatCountRaw > 0 ? seatCountRaw : 1;
+  // We *could* inspect attendees.length / seats, but with the composite
+  // (cal_booking_id, attendee_email) model, each row is one person.
+  // seat_count is therefore always 1 for new inserts.
+  const seat_count = 1;
 
   return {
     cal_booking_id: uid || id || bookingId || null,
@@ -161,7 +161,7 @@ router.post("/programs/:id/sync", async (req, res) => {
 
    Returns:
      capacity         (from programs.max_capacity)
-     bookedCount      (SUM of seat_count for future active bookings)
+     bookedCount      (# of rows = # participants for future active bookings)
      freeSeats        (capacity - bookedCount)
      waitlistWaiting  (# of waitlist rows with status='waiting')
 ============================================================ */
@@ -192,19 +192,10 @@ router.get("/programs/:id/summary", async (req, res) => {
     const prog = progRes.rows[0];
     const nowIso = new Date().toISOString();
 
-    // use SUM(seat_count), not COUNT(*)
+    // New model: 1 booking row = 1 participant = 1 seat
     const bookRes = await pool.query(
       `
-      SELECT COALESCE(
-        SUM(
-          CASE
-            WHEN seat_count IS NOT NULL AND seat_count > 0
-              THEN seat_count
-            ELSE 1
-          END
-        ),
-        0
-      ) AS cnt
+      SELECT COUNT(*) AS cnt
       FROM bookings
       WHERE program_id = $1
         AND (event_start IS NULL OR event_start >= $2)

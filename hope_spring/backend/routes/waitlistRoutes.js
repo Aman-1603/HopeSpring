@@ -206,7 +206,9 @@ router.post("/:id/cancel", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error cancelling waitlist entry:", err);
-    return res.status(500).json({ error: "Failed to cancel waitlist entry" });
+    return res
+      .status(500)
+      .json({ error: "Failed to cancel waitlist entry" });
   }
 });
 
@@ -366,10 +368,22 @@ router.post("/:id/promote", async (req, res) => {
     const attendeeFromCal =
       (Array.isArray(calData.attendees) && calData.attendees[0]) || null;
 
-    const attendeeEmail =
+    let attendeeEmail =
       attendeeFromCal?.email || entry.attendee_email || null;
+    attendeeEmail = normalizeEmail(attendeeEmail);
+
     const attendeeName =
       attendeeFromCal?.name || entry.attendee_name || null;
+
+    if (!attendeeEmail) {
+      console.error(
+        "❌ promote: missing attendeeEmail after Cal response + entry fallback",
+        { calDataAttendee: attendeeFromCal, entry }
+      );
+      return res
+        .status(500)
+        .json({ error: "Internal error: missing attendee email for booking" });
+    }
 
     const status = calData.status || "ACCEPTED";
     const userId = entry.member_id || null;
@@ -381,7 +395,7 @@ router.post("/:id/promote", async (req, res) => {
       apiPayload: payload,
     };
 
-    // 5) Upsert into bookings table (same pattern as webhook)
+    // 5) Upsert into bookings table (same composite key pattern as webhook)
     const insertRes = await pool.query(
       `
       INSERT INTO bookings (
@@ -400,7 +414,7 @@ router.post("/:id/promote", async (req, res) => {
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
       )
-      ON CONFLICT (cal_booking_id)
+      ON CONFLICT (cal_booking_id, attendee_email)
       DO UPDATE SET
         program_id        = EXCLUDED.program_id,
         user_id           = EXCLUDED.user_id,

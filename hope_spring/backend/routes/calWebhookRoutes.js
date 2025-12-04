@@ -151,6 +151,8 @@ async function resolveUserIdFromBooking(norm) {
 
 /* ============================================================
    BOOKING_CREATED
+   - Use (cal_booking_id, attendee_email) as composite identity
+   - One row == one participant
 ============================================================ */
 async function handleBookingCreated(payload) {
   const norm = normalizeCalBooking(payload);
@@ -171,17 +173,23 @@ async function handleBookingCreated(payload) {
   }
 
   const attendeeName = norm.attendee_name || "Participant";
-  const attendeeEmail = norm.attendee_email || "unknown@example.com";
+  const attendeeEmail = (norm.attendee_email || "").trim().toLowerCase();
+
+  if (!attendeeEmail) {
+    console.warn(
+      "[Cal webhook] BOOKING_CREATED without attendee_email for uid:",
+      uid
+    );
+    return;
+  }
+
   const start = norm.event_start || null;
   const end = norm.event_end || null;
 
-  // seat count
-  const seatCount =
-    Array.isArray(payload?.attendees) && payload.attendees.length > 0
-      ? payload.attendees.length
-      : norm.seat_count || 1;
+  // One row == one participant per Cal workaround
+  const seatCount = 1;
 
-  // 🔍 map to users.user_id
+  // Resolve users.user_id (may be null if no match)
   const userId = await resolveUserIdFromBooking({
     ...norm,
     attendee_email: attendeeEmail,
@@ -203,7 +211,7 @@ async function handleBookingCreated(payload) {
       created_at
     )
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACCEPTED',$9,NOW())
-    ON CONFLICT (cal_booking_id)
+    ON CONFLICT (cal_booking_id, attendee_email)
     DO UPDATE SET
       program_id     = EXCLUDED.program_id,
       user_id        = EXCLUDED.user_id,
@@ -229,61 +237,118 @@ async function handleBookingCreated(payload) {
   );
 
   console.log(
-    "[Cal webhook] BOOKING_CREATED synced:",
+    "[Cal webhook] BOOKING_CREATED synced (uid/email):",
     uid,
+    attendeeEmail,
     "→ program",
     programId,
     "user_id=",
     userId,
-    "seats=",
+    "seatCount=",
     seatCount
   );
 }
 
 /* ============================================================
    BOOKING_CANCELLED
+   - Prefer (uid, attendee_email) if available
+   - Fallback: update all rows with that uid
 ============================================================ */
 async function handleBookingCancelled(payload) {
-  const uid = payload?.uid;
+  const norm = normalizeCalBooking(payload);
+  const uid = norm?.cal_booking_id || payload?.uid;
+
   if (!uid) {
     console.warn("[Cal webhook] BOOKING_CANCELLED without uid:", payload);
     return;
   }
 
-  await pool.query(
-    `
-    UPDATE bookings
-    SET status = 'CANCELLED',
-        raw = $2
-    WHERE cal_booking_id = $1
-    `,
-    [uid, payload]
-  );
+  const attendeeEmail = (norm.attendee_email || "").trim().toLowerCase();
 
-  console.log("[Cal webhook] BOOKING_CANCELLED synced:", uid);
+  if (attendeeEmail) {
+    await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'CANCELLED',
+          raw = $3
+      WHERE cal_booking_id = $1
+        AND attendee_email = $2
+      `,
+      [uid, attendeeEmail, payload]
+    );
+
+    console.log(
+      "[Cal webhook] BOOKING_CANCELLED synced (uid/email):",
+      uid,
+      attendeeEmail
+    );
+  } else {
+    // Last resort: cancel all rows for this uid
+    await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'CANCELLED',
+          raw = $2
+      WHERE cal_booking_id = $1
+      `,
+      [uid, payload]
+    );
+
+    console.log(
+      "[Cal webhook] BOOKING_CANCELLED synced (uid only):",
+      uid
+    );
+  }
 }
 
 /* ============================================================
    BOOKING_REJECTED
+   - Same logic as CANCELLED
 ============================================================ */
 async function handleBookingRejected(payload) {
-  const uid = payload?.uid;
+  const norm = normalizeCalBooking(payload);
+  const uid = norm?.cal_booking_id || payload?.uid;
+
   if (!uid) {
     console.warn("[Cal webhook] BOOKING_REJECTED without uid:", payload);
     return;
   }
 
-  await pool.query(
-    `
-    UPDATE bookings
-    SET status = 'REJECTED',
-        raw = $2
-    WHERE cal_booking_id = $1
-    `,
-    [uid, payload]
-  );
+  const attendeeEmail = (norm.attendee_email || "").trim().toLowerCase();
 
-  console.log("[Cal webhook] BOOKING_REJECTED synced:", uid);
+  if (attendeeEmail) {
+    await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'REJECTED',
+          raw = $3
+      WHERE cal_booking_id = $1
+        AND attendee_email = $2
+      `,
+      [uid, attendeeEmail, payload]
+    );
+
+    console.log(
+      "[Cal webhook] BOOKING_REJECTED synced (uid/email):",
+      uid,
+      attendeeEmail
+    );
+  } else {
+    await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'REJECTED',
+          raw = $2
+      WHERE cal_booking_id = $1
+      `,
+      [uid, payload]
+    );
+
+    console.log(
+      "[Cal webhook] BOOKING_REJECTED synced (uid only):",
+      uid
+    );
+  }
 }
 
 export default router;
