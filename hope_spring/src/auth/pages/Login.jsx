@@ -1,7 +1,7 @@
 // src/features/auth/pages/Login.jsx
 import { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext"; // ⬅️ adjust path if needed
+import { useAuth } from "../../contexts/AuthContext"; // adjust path if needed
 import HopeSpringLogo from "../../assets/HopeSpring_Logo.svg";
 
 const Login = () => {
@@ -37,6 +37,7 @@ const Login = () => {
       });
 
       const data = await res.json();
+      console.log("LOGIN RESPONSE:", data);
 
       if (!res.ok || !data.success) {
         setError(data.message || "Invalid email or password");
@@ -44,18 +45,31 @@ const Login = () => {
         return;
       }
 
-      // Build user object for client
+      // ✅ backend should return: { success, message, token, user }
+      const { token, user } = data;
+
+      if (!token || !user) {
+        console.error("Login response missing token or user:", data);
+        setError("Invalid server response. Please try again later.");
+        setSubmitting(false);
+        return;
+      }
+
+      // ✅ save JWT for protected routes
+      localStorage.setItem("hs_token", token);
+
+      // ✅ normalize user object for client
       const userForClient = {
-        id: data.user.id,
-        fullName: data.user.name,
-        email: data.user.email,
-        role: data.user.role,
+        id: user.id,
+        fullName: user.name,
+        email: user.email,
+        role: user.role,
       };
 
-      // Update context + localStorage
-      login(data.token, userForClient);
+      // ✅ update auth context
+      login(token, userForClient);
 
-      // Redirect priority:
+      // ✅ redirect priority:
       // 1) redirect query param (if present)
       // 2) admin dashboard
       // 3) member dashboard
@@ -67,7 +81,7 @@ const Login = () => {
         navigate("/user/dashboard", { replace: true });
       }
     } catch (err) {
-      console.error(err);
+      console.error("Login error:", err);
       setError("Something went wrong. Please try again later.");
     } finally {
       setSubmitting(false);
