@@ -1,12 +1,13 @@
 // src/components/Pages/GetFreeSupport/Programs/ProgramTemplate/ProgramTemplate.js
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../../../../contexts/AuthContext";
 
 const PROGRAMS_API = "/api/programs";
 const CAL_SLOTS_API = "/api/cal/programs";
 const WAITLIST_API = "/api/waitlist";
-const BOOKINGS_SUMMARY_API = "/api/bookings/programs";
+const BOOKINGS_API = "/api/bookings/programs";
 
 const normalize = (v) =>
   (v || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -67,57 +68,7 @@ const fmtMonthDay = (isoOrYmd) => {
   }
 };
 
-// try to detect if a Cal slot still has seats
-function slotHasFreeSeat(slot) {
-  if (!slot) return false;
-
-  // common seat fields from Cal /v2/slots – we don't trust names, so we check a few
-  const n =
-    slot.seatsAvailable ??
-    slot.availableSeats ??
-    slot.seats_remaining ??
-    slot.remainingSeats ??
-    null;
-
-  if (typeof n === "number") return n > 0;
-
-  if (typeof slot.isSeatAvailable === "boolean") return slot.isSeatAvailable;
-  if (typeof slot.isAvailable === "boolean") return slot.isAvailable;
-
-  // if we can't tell, assume it's available (safer: we *won't* wrongly block registration)
-  return true;
-}
-
-// centralised "is this program full?" logic
-function computeIsFull({ linked, program, summary, calSlots }) {
-  if (!linked) return false;
-
-  const capacityFromProg =
-    program.max_capacity != null ? Number(program.max_capacity) : null;
-  const participantsFromProg =
-    program.participants != null ? Number(program.participants) : 0;
-
-  const capacity = summary?.capacity ?? capacityFromProg;
-  const bookedCount = summary?.bookedCount ?? participantsFromProg;
-  const freeSeatsFromSummary =
-    summary?.freeSeats ??
-    (capacity != null ? Math.max(capacity - bookedCount, 0) : null);
-
-  // ✅ DB is the single source of truth when capacity exists
-  if (capacity != null) {
-    // treat <= 0 as full (overbooked should still show "full")
-    return freeSeatsFromSummary <= 0;
-  }
-
-  // ❓ No capacity configured → fall back to Cal slots only
-  const slots = calSlots || [];
-  if (slots.length === 0) return false;
-
-  const hasAnyFreeSlot = slots.some(slotHasFreeSeat);
-  return !hasAnyFreeSlot;
-}
-
-/* ---------- Program card (waitlist-aware) ---------- */
+/* ---------- Program card (waitlist-aware, date-aware) ---------- */
 
 const ProgramCard = ({
   p,
@@ -126,6 +77,7 @@ const ProgramCard = ({
   calDates = [],
   isFull = false,
   onJoinWaitlist,
+  fullDates = [],
 }) => {
   const occs = p.occurrences || [];
 
@@ -136,6 +88,14 @@ const ProgramCard = ({
   const moreCount = hasCalDates
     ? calDates.length - showCalDates.length
     : occs.length - showOccs.length;
+
+  // Dates that are fully booked (YYYY-MM-DD)
+  const uniqueFullDates = Array.from(new Set(fullDates || []));
+
+  const fullDatesLabel =
+    uniqueFullDates.length > 0
+      ? uniqueFullDates.map((d) => fmtMonthDay(d)).join(", ")
+      : "";
 
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5 shadow-sm hover:shadow-md transition">
@@ -172,6 +132,14 @@ const ProgramCard = ({
         </div>
       )}
 
+      {/* Small text for specific full dates */}
+      {uniqueFullDates.length > 0 && (
+        <p className="mt-2 text-xs text-amber-700">
+          {fullDatesLabel} {uniqueFullDates.length === 1 ? "is" : "are"} full.
+          You can join the waitlist for those dates.
+        </p>
+      )}
+
       {/* CTA logic */}
       {!linked ? (
         <button
@@ -182,6 +150,7 @@ const ProgramCard = ({
           Not yet open
         </button>
       ) : isFull ? (
+        // All dates full → only waitlist
         <button
           type="button"
           onClick={() => onJoinWaitlist && onJoinWaitlist(p)}
@@ -190,13 +159,25 @@ const ProgramCard = ({
           Join waitlist
         </button>
       ) : (
-        <button
-          type="button"
-          onClick={() => onRegister(p)}
-          className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
-        >
-          Register here
-        </button>
+        // Some dates still open → Register + optional waitlist for full dates
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onRegister && onRegister(p)}
+            className="inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
+          >
+            Register here
+          </button>
+          {uniqueFullDates.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onJoinWaitlist && onJoinWaitlist(p)}
+              className="inline-block rounded-lg bg-amber-600 text-white px-4 py-2 text-sm font-semibold hover:bg-amber-700"
+            >
+              Join waitlist for full dates
+            </button>
+          )}
+        </div>
       )}
     </article>
   );
@@ -259,6 +240,9 @@ const CalBookingModal = ({
 /* ---------- MAIN TEMPLATE ---------- */
 
 export default function ProgramTemplate({ config }) {
+  const location = useLocation();
+  const { user, token } = useAuth();
+
   const {
     slug = "meditation",
     categoryName = "Gentle Exercise",
@@ -286,7 +270,8 @@ export default function ProgramTemplate({ config }) {
     faqAlt,
   } = config || {};
 
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const loggedInUser = user || null;
+  const authToken = token || null;
 
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
@@ -299,17 +284,12 @@ export default function ProgramTemplate({ config }) {
   const [slotsLoading, setSlotsLoading] = useState(false);
 
   const [summaryByProgram, setSummaryByProgram] = useState({});
+  const [slotUsageByProgram, setSlotUsageByProgram] = useState({});
 
-  /* ---- logged-in user ---- */
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("hsUser");
-      if (!raw) return;
-      setLoggedInUser(JSON.parse(raw));
-    } catch (e) {
-      console.error("Failed to parse hsUser from localStorage", e);
-    }
-  }, []);
+  const redirectToLogin = () => {
+    const redirect = encodeURIComponent(location.pathname);
+    window.location.href = `/login?redirect=${redirect}`;
+  };
 
   /* ---- load programs for this category/subcategory ---- */
   useEffect(() => {
@@ -401,9 +381,14 @@ export default function ProgramTemplate({ config }) {
     };
   }, [programs]);
 
-  /* ---- load bookings summary for each program ---- */
+  /* ---- load bookings summary for each program (protected API) ---- */
   useEffect(() => {
     if (!programs || programs.length === 0) return;
+
+    if (!authToken) {
+      setSummaryByProgram({});
+      return;
+    }
 
     let cancelled = false;
 
@@ -413,9 +398,13 @@ export default function ProgramTemplate({ config }) {
           programs.map(async (p) => {
             try {
               const res = await axios.get(
-                `${BOOKINGS_SUMMARY_API}/${p.id}/summary`
+                `${BOOKINGS_API}/${p.id}/summary`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${authToken}`,
+                  },
+                }
               );
-              console.log("Summary for program", p.id, res.data);
               return [p.id, res.data];
             } catch (err) {
               console.error("summary fetch failed for program", p.id, err);
@@ -440,7 +429,78 @@ export default function ProgramTemplate({ config }) {
     return () => {
       cancelled = true;
     };
-  }, [programs]);
+  }, [programs, authToken]);
+
+  /* ---- load slot-usage (per-date capacity) for each program ---- */
+  useEffect(() => {
+    if (!programs || programs.length === 0) return;
+    if (!authToken) {
+      setSlotUsageByProgram({});
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSlotUsage() {
+      try {
+        const results = await Promise.all(
+          programs.map(async (p) => {
+            try {
+              const res = await axios.get(
+                `${BOOKINGS_API}/${p.id}/slot-usage`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${authToken}`,
+                  },
+                }
+              );
+              return [p.id, res.data];
+            } catch (err) {
+              console.error("slot-usage fetch failed for program", p.id, err);
+              return [p.id, null];
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        const map = {};
+        for (const [id, usage] of results) {
+          map[id] = usage;
+        }
+        setSlotUsageByProgram(map);
+      } catch (err) {
+        console.error("Error loading slot usage:", err);
+      }
+    }
+
+    loadSlotUsage();
+    return () => {
+      cancelled = true;
+    };
+  }, [programs, authToken]);
+
+  /* ---- derive full dates per program from slot-usage ---- */
+  const getFullDatesForProgram = (programId) => {
+    const usage = slotUsageByProgram[programId];
+    if (!usage || !Array.isArray(usage.slots)) return [];
+
+    const perSlotCap =
+      usage.capacityPerSlot != null ? Number(usage.capacityPerSlot) : null;
+    if (perSlotCap == null || perSlotCap <= 0) return [];
+
+    const dates = [];
+    for (const s of usage.slots) {
+      const startIso = s.eventStart || s.startTime || s.start || null;
+      const booked = Number(
+        s.bookedCount ?? s.count ?? s.seats ?? s.seatCount ?? 0
+      );
+      if (startIso && booked >= perSlotCap) {
+        dates.push(startIso.substring(0, 10)); // YYYY-MM-DD
+      }
+    }
+    return dates;
+  };
 
   const leftPrograms = useMemo(
     () => programs.filter((p) => (p.column_index || 1) === 1),
@@ -452,6 +512,11 @@ export default function ProgramTemplate({ config }) {
   );
 
   const openBookingFor = (p) => {
+    if (!loggedInUser || !authToken) {
+      redirectToLogin();
+      return;
+    }
+
     const linked = !!(p?.cal_user && p?.cal_slug && p?.cal_event_type_id);
     if (!linked) return;
     setSelectedProgram(p);
@@ -467,17 +532,28 @@ export default function ProgramTemplate({ config }) {
     try {
       if (!p?.id) return;
 
+      if (!loggedInUser || !authToken) {
+        redirectToLogin();
+        return;
+      }
+
       const body = {
         programId: p.id,
         memberId: loggedInUser?.id || null,
-        name: loggedInUser?.name || null,
+        name: loggedInUser?.fullName || loggedInUser?.name || null,
         email: loggedInUser?.email || null,
       };
 
-      const res = await axios.post(`${WAITLIST_API}/join`, body);
+      const res = await axios.post(`${WAITLIST_API}/join`, body, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
       const data = res.data || {};
 
-      if (data.existing) {
+      if (data.alreadyBooked) {
+        window.alert("You already have a booking for this program.");
+      } else if (data.existing) {
         window.alert("You are already on the waitlist for this program.");
       } else {
         window.alert("You have been added to the waitlist for this program.");
@@ -612,6 +688,13 @@ export default function ProgramTemplate({ config }) {
           title={`${subcategoryName} programs for the cancer community`}
         />
 
+        {!loggedInUser && (
+          <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block">
+            Please log in to register or join a waitlist. You’ll be redirected
+            to the login page if you click “Register here” or “Join waitlist”.
+          </p>
+        )}
+
         {loadingPrograms && (
           <p className="mt-4 text-gray-500 text-sm">Loading programs…</p>
         )}
@@ -641,14 +724,26 @@ export default function ProgramTemplate({ config }) {
                     dates: [],
                     slots: [],
                   };
-                  const summary = summaryByProgram[p.id] || null;
+                  const fullDates = getFullDatesForProgram(p.id);
 
-                  const isFull = computeIsFull({
-                    linked,
-                    program: p,
-                    summary,
-                    calSlots: slotInfo.slots,
-                  });
+                  // Cal dates from Cal slots endpoint
+                  const calDates = slotInfo.dates || [];
+                  // Fallback to DB occurrence dates if no Cal dates
+                  const occDates = (p.occurrences || [])
+                    .map((o) => (o.starts_at || "").substring(0, 10))
+                    .filter(Boolean);
+
+                  const allDates = calDates.length > 0 ? calDates : occDates;
+                  const fullSet = new Set(fullDates);
+
+                  // true if there is at least one date that is NOT full
+                  const hasBookableDate = allDates.some(
+                    (d) => !fullSet.has(d)
+                  );
+
+                  // For UI: "full" means there are dates but none are bookable
+                  const isUiFull =
+                    linked && allDates.length > 0 && !hasBookableDate;
 
                   return (
                     <ProgramCard
@@ -657,8 +752,9 @@ export default function ProgramTemplate({ config }) {
                       linked={linked}
                       onRegister={openBookingFor}
                       calDates={slotInfo.dates}
-                      isFull={isFull}
+                      isFull={isUiFull}
                       onJoinWaitlist={joinWaitlistFor}
+                      fullDates={fullDates}
                     />
                   );
                 })}
@@ -676,14 +772,20 @@ export default function ProgramTemplate({ config }) {
                     dates: [],
                     slots: [],
                   };
-                  const summary = summaryByProgram[p.id] || null;
+                  const fullDates = getFullDatesForProgram(p.id);
 
-                  const isFull = computeIsFull({
-                    linked,
-                    program: p,
-                    summary,
-                    calSlots: slotInfo.slots,
-                  });
+                  const calDates = slotInfo.dates || [];
+                  const occDates = (p.occurrences || [])
+                    .map((o) => (o.starts_at || "").substring(0, 10))
+                    .filter(Boolean);
+
+                  const allDates = calDates.length > 0 ? calDates : occDates;
+                  const fullSet = new Set(fullDates);
+                  const hasBookableDate = allDates.some(
+                    (d) => !fullSet.has(d)
+                  );
+                  const isUiFull =
+                    linked && allDates.length > 0 && !hasBookableDate;
 
                   return (
                     <ProgramCard
@@ -692,8 +794,9 @@ export default function ProgramTemplate({ config }) {
                       linked={linked}
                       onRegister={openBookingFor}
                       calDates={slotInfo.dates}
-                      isFull={isFull}
+                      isFull={isUiFull}
                       onJoinWaitlist={joinWaitlistFor}
+                      fullDates={fullDates}
                     />
                   );
                 })}
@@ -774,7 +877,7 @@ export default function ProgramTemplate({ config }) {
         onClose={closeBooking}
         calUser={selectedProgram?.cal_user}
         calSlug={selectedProgram?.cal_slug}
-        name={loggedInUser?.name}
+        name={loggedInUser?.fullName || loggedInUser?.name}
         email={loggedInUser?.email}
         userId={loggedInUser?.id}
         programTitle={selectedProgram?.title}
