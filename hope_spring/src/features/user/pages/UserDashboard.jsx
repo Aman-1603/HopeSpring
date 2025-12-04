@@ -22,6 +22,8 @@ const UserDashboard = () => {
   }, [user, navigate]);
 
   console.log("UserDashboard rendered with user:", user);
+  console.log("TOken in localStorage:", localStorage.getItem("hs_token"));
+  console.log("User:", user);
 
   
 
@@ -44,6 +46,7 @@ useEffect(() => {
 
 
       const data = await res.json();
+      console.log("Fetched bookings data:", data);
 
       if (!data.success) {
         throw new Error(data.message || "Failed to fetch bookings");
@@ -144,6 +147,7 @@ useEffect(() => {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("hs_token");
     logout();
     navigate("/");
   };
