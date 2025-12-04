@@ -10,6 +10,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import AdminLayout from "../AdminLayout";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const PROGRAMS_API = "/api/programs";
 const SUMMARY_API = "/api/bookings/programs";
@@ -246,6 +247,9 @@ function PromoteModal({
 /* ---------- MAIN PAGE ---------- */
 
 export default function AdminWaitlist() {
+  const { token } = useAuth();
+  const authToken = token || null;
+
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [programsError, setProgramsError] = useState(null);
@@ -263,15 +267,19 @@ export default function AdminWaitlist() {
   const [promoteLoading, setPromoteLoading] = useState(false);
   const [promoteError, setPromoteError] = useState(null);
 
+  // common axios config for protected endpoints
+  const authConfig = authToken
+    ? { headers: { Authorization: `Bearer ${authToken}` } }
+    : {};
+
   /* ----- load programs with Cal integration ----- */
   useEffect(() => {
     const loadPrograms = async () => {
       try {
         setLoadingPrograms(true);
-        const res = await axios.get(PROGRAMS_API);
+        const res = await axios.get(PROGRAMS_API); // public endpoint
         const all = res.data || [];
 
-        // Prefer active programs with cal_event_type_id
         const filtered = all.filter(
           (p) => p.cal_event_type_id && p.is_active !== false
         );
@@ -309,7 +317,7 @@ export default function AdminWaitlist() {
     return [];
   }
 
-  /* ----- load summary + waitlist + slots when program changes ----- */
+  /* ----- load summary + waitlist + slots when program OR auth changes ----- */
   useEffect(() => {
     const load = async () => {
       if (!selectedProgramId) return;
@@ -321,9 +329,9 @@ export default function AdminWaitlist() {
         setDataError(null);
 
         const [summaryRes, waitlistRes, slotsRes] = await Promise.all([
-          axios.get(`${SUMMARY_API}/${pid}/summary`),
-          axios.get(`${WAITLIST_API}/program/${pid}`),
-          axios.get(`${CAL_SLOTS_API}/${pid}/slots`),
+          axios.get(`${SUMMARY_API}/${pid}/summary`, authConfig),
+          axios.get(`${WAITLIST_API}/program/${pid}`, authConfig),
+          axios.get(`${CAL_SLOTS_API}/${pid}/slots`, authConfig),
         ]);
 
         setSummary(summaryRes.data || null);
@@ -340,7 +348,7 @@ export default function AdminWaitlist() {
     };
 
     load();
-  }, [selectedProgramId]);
+  }, [selectedProgramId, authToken]); // refetch if token changes
 
   const waitingEntries = useMemo(
     () => waitlist.filter((w) => w.status === "waiting"),
@@ -362,9 +370,9 @@ export default function AdminWaitlist() {
       setLoadingData(true);
       setDataError(null);
       const [summaryRes, waitlistRes, slotsRes] = await Promise.all([
-        axios.get(`${SUMMARY_API}/${pid}/summary`),
-        axios.get(`${WAITLIST_API}/program/${pid}`),
-        axios.get(`${CAL_SLOTS_API}/${pid}/slots`),
+        axios.get(`${SUMMARY_API}/${pid}/summary`, authConfig),
+        axios.get(`${WAITLIST_API}/program/${pid}`, authConfig),
+        axios.get(`${CAL_SLOTS_API}/${pid}/slots`, authConfig),
       ]);
 
       setSummary(summaryRes.data || null);
@@ -394,17 +402,19 @@ export default function AdminWaitlist() {
     try {
       const slotEnd = slot.endTime || slot.end || null;
 
-      await axios.post(`${WAITLIST_API}/${promoteEntry.id}/promote`, {
-        programId: pid,
-        slotStart: slot.start,
-        slotEnd: slotEnd,
-      });
+      await axios.post(
+        `${WAITLIST_API}/${promoteEntry.id}/promote`,
+        {
+          programId: pid,
+          slotStart: slot.start,
+          slotEnd: slotEnd,
+        },
+        authConfig
+      );
 
-      // After successful promote:
       setPromoteModalOpen(false);
       setPromoteEntry(null);
 
-      // Refresh summary + waitlist
       await handleRefresh();
     } catch (err) {
       console.error("Error promoting waitlist entry:", err);
@@ -421,7 +431,7 @@ export default function AdminWaitlist() {
   const handleCancelWaitlist = async (entryId) => {
     if (!entryId) return;
     try {
-      await axios.post(`${WAITLIST_API}/${entryId}/cancel`);
+      await axios.post(`${WAITLIST_API}/${entryId}/cancel`, null, authConfig);
       await handleRefresh();
     } catch (err) {
       console.error("Error cancelling waitlist entry:", err);

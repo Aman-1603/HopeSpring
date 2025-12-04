@@ -26,6 +26,10 @@ const WAITLIST_STATUS = {
 /* ------------------------------------------
    POST /api/waitlist/join
    Body: { programId, memberId?, name?, email? }
+
+   New rule:
+   - If there is already an ACTIVE/FUTURE booking for this program
+     with the same email, we DO NOT add to waitlist.
 -------------------------------------------*/
 router.post("/join", async (req, res) => {
   try {
@@ -59,7 +63,35 @@ router.post("/join", async (req, res) => {
 
     const trimmedEmail = normalizeEmail(email);
 
-    // 2) Avoid duplicate "waiting" entries
+    // 2) HARD RULE: if this email already has a future active booking
+    //    for this program → reject waitlist.
+    if (trimmedEmail) {
+      const nowIso = new Date().toISOString();
+
+      const existingBookingRes = await pool.query(
+        `
+        SELECT id
+        FROM bookings
+        WHERE program_id = $1
+          AND attendee_email IS NOT NULL
+          AND LOWER(attendee_email) = $2
+          AND LOWER(status) IN ('accepted','confirmed','booked')
+          AND (event_start IS NULL OR event_start >= $3)
+        LIMIT 1
+        `,
+        [pid, trimmedEmail, nowIso]
+      );
+
+      if (existingBookingRes.rows.length > 0) {
+        return res.status(200).json({
+          ok: true,
+          alreadyBooked: true,
+          message: "This email already has a booking for this program.",
+        });
+      }
+    }
+
+    // 3) Avoid duplicate "waiting" entries on the waitlist itself
     const existingRes = await pool.query(
       `
       SELECT id, program_id, member_id, attendee_name, attendee_email, status, created_at
@@ -85,7 +117,7 @@ router.post("/join", async (req, res) => {
       });
     }
 
-    // 3) Insert new waitlist row
+    // 4) Insert new waitlist row
     const insertRes = await pool.query(
       `
       INSERT INTO waitlist (

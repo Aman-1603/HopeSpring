@@ -30,9 +30,8 @@ export function normalizeCalBooking(calPayload) {
 
   const first = attendees[0] || {};
 
-  // We *could* inspect attendees.length / seats, but with the composite
-  // (cal_booking_id, attendee_email) model, each row is one person.
-  // seat_count is therefore always 1 for new inserts.
+  // With the composite (cal_booking_id, attendee_email) model,
+  // each row is one person. seat_count is therefore always 1.
   const seat_count = 1;
 
   return {
@@ -66,7 +65,7 @@ router.get("/", async (req, res) => {
       `
       SELECT
         b.*,
-        p.title   AS program_title,
+        p.title    AS program_title,
         p.category AS program_category
       FROM bookings b
       LEFT JOIN programs p ON p.id = b.program_id
@@ -113,7 +112,7 @@ router.get("/user/:userId", async (req, res) => {
       `
       SELECT
         b.*,
-        p.title   AS program_title,
+        p.title    AS program_title,
         p.category AS program_category
       FROM bookings b
       LEFT JOIN programs p ON p.id = b.program_id
@@ -237,6 +236,88 @@ router.get("/programs/:id/summary", async (req, res) => {
   } catch (err) {
     console.error("❌ Error loading summary:", err);
     res.status(500).json({ error: "Failed to load summary" });
+  }
+});
+
+/* ============================================================
+   GET /api/bookings/programs/:id/slot-usage
+   Slot-level seat usage for a program.
+
+   Returns:
+     {
+       programId,
+       capacityPerSlot,       // from programs.max_capacity (can be null)
+       slots: [
+         {
+           eventStart: ISO string,
+           bookedCount: number
+         },
+         ...
+       ]
+     }
+
+   Notes:
+     - Only counts future (or undated) bookings with active status
+     - If a slot has no bookings yet, it won't appear here
+       → frontend treats missing = 0 booked
+============================================================ */
+router.get("/programs/:id/slot-usage", async (req, res) => {
+  try {
+    const programId = Number(req.params.id);
+    if (!programId || !Number.isFinite(programId)) {
+      return res.status(400).json({ error: "Invalid program id" });
+    }
+
+    // 1) Load program to get capacity per slot
+    const progRes = await pool.query(
+      `
+      SELECT id, max_capacity
+      FROM programs
+      WHERE id = $1
+      `,
+      [programId]
+    );
+
+    if (progRes.rows.length === 0) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const prog = progRes.rows[0];
+    const capacityPerSlot =
+      prog.max_capacity != null ? Number(prog.max_capacity) : null;
+
+    const nowIso = new Date().toISOString();
+
+    // 2) Aggregate bookings by event_start
+    const rowsRes = await pool.query(
+      `
+      SELECT
+        event_start,
+        COUNT(*) AS booked_cnt
+      FROM bookings
+      WHERE program_id = $1
+        AND event_start IS NOT NULL
+        AND (event_start >= $2)
+        AND LOWER(status) IN ('accepted','confirmed','booked')
+      GROUP BY event_start
+      ORDER BY event_start
+      `,
+      [programId, nowIso]
+    );
+
+    const slots = (rowsRes.rows || []).map((row) => ({
+      eventStart: row.event_start, // timestamptz → ISO when JSON stringified
+      bookedCount: Number(row.booked_cnt || 0),
+    }));
+
+    return res.json({
+      programId,
+      capacityPerSlot,
+      slots,
+    });
+  } catch (err) {
+    console.error("❌ Error loading slot usage:", err);
+    return res.status(500).json({ error: "Failed to load slot usage" });
   }
 });
 
