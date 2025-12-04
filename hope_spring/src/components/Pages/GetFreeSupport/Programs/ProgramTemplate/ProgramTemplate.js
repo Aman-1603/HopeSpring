@@ -1,7 +1,8 @@
 // src/components/Pages/GetFreeSupport/Programs/ProgramTemplate/ProgramTemplate.js
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../../../../contexts/AuthContext"; // ⬅️ adjust relative path if needed
 
 const PROGRAMS_API = "/api/programs";
 const CAL_SLOTS_API = "/api/cal/programs";
@@ -71,7 +72,6 @@ const fmtMonthDay = (isoOrYmd) => {
 function slotHasFreeSeat(slot) {
   if (!slot) return false;
 
-  // common seat fields from Cal /v2/slots – we don't trust names, so we check a few
   const n =
     slot.seatsAvailable ??
     slot.availableSeats ??
@@ -84,7 +84,7 @@ function slotHasFreeSeat(slot) {
   if (typeof slot.isSeatAvailable === "boolean") return slot.isSeatAvailable;
   if (typeof slot.isAvailable === "boolean") return slot.isAvailable;
 
-  // if we can't tell, assume it's available (safer: we *won't* wrongly block registration)
+  // if we can't tell, assume it's available (we won't wrongly block)
   return true;
 }
 
@@ -103,13 +103,12 @@ function computeIsFull({ linked, program, summary, calSlots }) {
     summary?.freeSeats ??
     (capacity != null ? Math.max(capacity - bookedCount, 0) : null);
 
-  // ✅ DB is the single source of truth when capacity exists
+  // DB is source of truth when capacity exists
   if (capacity != null) {
-    // treat <= 0 as full (overbooked should still show "full")
     return freeSeatsFromSummary <= 0;
   }
 
-  // ❓ No capacity configured → fall back to Cal slots only
+  // No capacity configured → fall back to Cal slots only
   const slots = calSlots || [];
   if (slots.length === 0) return false;
 
@@ -192,7 +191,7 @@ const ProgramCard = ({
       ) : (
         <button
           type="button"
-          onClick={() => onRegister(p)}
+          onClick={() => onRegister && onRegister(p)}
           className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
         >
           Register here
@@ -259,6 +258,9 @@ const CalBookingModal = ({
 /* ---------- MAIN TEMPLATE ---------- */
 
 export default function ProgramTemplate({ config }) {
+  const location = useLocation();
+  const { user, token } = useAuth(); // ✅ single source of truth
+
   const {
     slug = "meditation",
     categoryName = "Gentle Exercise",
@@ -286,7 +288,8 @@ export default function ProgramTemplate({ config }) {
     faqAlt,
   } = config || {};
 
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const loggedInUser = user || null;
+  const authToken = token || null;
 
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
@@ -300,16 +303,10 @@ export default function ProgramTemplate({ config }) {
 
   const [summaryByProgram, setSummaryByProgram] = useState({});
 
-  /* ---- logged-in user ---- */
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("hsUser");
-      if (!raw) return;
-      setLoggedInUser(JSON.parse(raw));
-    } catch (e) {
-      console.error("Failed to parse hsUser from localStorage", e);
-    }
-  }, []);
+  const redirectToLogin = () => {
+    const redirect = encodeURIComponent(location.pathname);
+    window.location.href = `/login?redirect=${redirect}`;
+  };
 
   /* ---- load programs for this category/subcategory ---- */
   useEffect(() => {
@@ -401,9 +398,15 @@ export default function ProgramTemplate({ config }) {
     };
   }, [programs]);
 
-  /* ---- load bookings summary for each program ---- */
+  /* ---- load bookings summary for each program (protected API) ---- */
   useEffect(() => {
     if (!programs || programs.length === 0) return;
+
+    // no token → skip /api/bookings calls
+    if (!authToken) {
+      setSummaryByProgram({});
+      return;
+    }
 
     let cancelled = false;
 
@@ -413,7 +416,12 @@ export default function ProgramTemplate({ config }) {
           programs.map(async (p) => {
             try {
               const res = await axios.get(
-                `${BOOKINGS_SUMMARY_API}/${p.id}/summary`
+                `${BOOKINGS_SUMMARY_API}/${p.id}/summary`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${authToken}`,
+                  },
+                }
               );
               console.log("Summary for program", p.id, res.data);
               return [p.id, res.data];
@@ -440,7 +448,7 @@ export default function ProgramTemplate({ config }) {
     return () => {
       cancelled = true;
     };
-  }, [programs]);
+  }, [programs, authToken]);
 
   const leftPrograms = useMemo(
     () => programs.filter((p) => (p.column_index || 1) === 1),
@@ -452,6 +460,12 @@ export default function ProgramTemplate({ config }) {
   );
 
   const openBookingFor = (p) => {
+    // must be logged in + token
+    if (!loggedInUser || !authToken) {
+      redirectToLogin();
+      return;
+    }
+
     const linked = !!(p?.cal_user && p?.cal_slug && p?.cal_event_type_id);
     if (!linked) return;
     setSelectedProgram(p);
@@ -467,14 +481,23 @@ export default function ProgramTemplate({ config }) {
     try {
       if (!p?.id) return;
 
+      if (!loggedInUser || !authToken) {
+        redirectToLogin();
+        return;
+      }
+
       const body = {
         programId: p.id,
         memberId: loggedInUser?.id || null,
-        name: loggedInUser?.name || null,
+        name: loggedInUser?.fullName || loggedInUser?.name || null,
         email: loggedInUser?.email || null,
       };
 
-      const res = await axios.post(`${WAITLIST_API}/join`, body);
+      const res = await axios.post(`${WAITLIST_API}/join`, body, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
       const data = res.data || {};
 
       if (data.existing) {
@@ -611,6 +634,13 @@ export default function ProgramTemplate({ config }) {
         <SectionTitle
           title={`${subcategoryName} programs for the cancer community`}
         />
+
+        {!loggedInUser && (
+          <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block">
+            Please log in to register or join a waitlist. You’ll be redirected
+            to the login page if you click “Register here” or “Join waitlist”.
+          </p>
+        )}
 
         {loadingPrograms && (
           <p className="mt-4 text-gray-500 text-sm">Loading programs…</p>
@@ -774,7 +804,7 @@ export default function ProgramTemplate({ config }) {
         onClose={closeBooking}
         calUser={selectedProgram?.cal_user}
         calSlug={selectedProgram?.cal_slug}
-        name={loggedInUser?.name}
+        name={loggedInUser?.fullName || loggedInUser?.name}
         email={loggedInUser?.email}
         userId={loggedInUser?.id}
         programTitle={selectedProgram?.title}

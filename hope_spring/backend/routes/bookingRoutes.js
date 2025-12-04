@@ -33,9 +33,7 @@ export function normalizeCalBooking(calPayload) {
     null;
 
   const seat_count =
-    typeof seatCountRaw === "number" && seatCountRaw > 0
-      ? seatCountRaw
-      : 1;
+    typeof seatCountRaw === "number" && seatCountRaw > 0 ? seatCountRaw : 1;
 
   return {
     cal_booking_id: uid || id || bookingId || null,
@@ -51,10 +49,19 @@ export function normalizeCalBooking(calPayload) {
 }
 
 /* ============================================================
-   GET /api/bookings          (Admin: all bookings)
+   GET /api/bookings
+   Admin: list ALL bookings
+   (server.js already enforces requireAuth, here we enforce role)
 ============================================================ */
 router.get("/", async (req, res) => {
   try {
+    // req.user is set by requireAuth in server.js
+    if (!req.user || req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin only" });
+    }
+
     const result = await pool.query(
       `
       SELECT
@@ -75,13 +82,31 @@ router.get("/", async (req, res) => {
 });
 
 /* ============================================================
-   GET /api/bookings/user/:userId   (Member: their bookings)
+   GET /api/bookings/user/:userId
+   Member: their bookings
+   - normal user: can ONLY view their own bookings
+   - admin: can view any userId
 ============================================================ */
 router.get("/user/:userId", async (req, res) => {
   try {
-    const uid = Number(req.params.userId);
-    if (!uid || !Number.isFinite(uid)) {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required" });
+    }
+
+    const requestedId = Number(req.params.userId);
+    if (!requestedId || !Number.isFinite(requestedId)) {
       return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isSelf = requestedId === req.user.id;
+
+    if (!isAdmin && !isSelf) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Forbidden" });
     }
 
     const result = await pool.query(
@@ -95,7 +120,7 @@ router.get("/user/:userId", async (req, res) => {
       WHERE b.user_id = $1
       ORDER BY b.event_start DESC NULLS LAST, b.created_at DESC
       `,
-      [uid]
+      [requestedId]
     );
 
     res.json({ success: true, bookings: result.rows });
@@ -107,7 +132,7 @@ router.get("/user/:userId", async (req, res) => {
 
 /* ============================================================
    POST /api/bookings/programs/:id/sync
-   (stub for future cleanup logic)
+   (placeholder)
 ============================================================ */
 router.post("/programs/:id/sync", async (req, res) => {
   try {
@@ -167,7 +192,7 @@ router.get("/programs/:id/summary", async (req, res) => {
     const prog = progRes.rows[0];
     const nowIso = new Date().toISOString();
 
-    // 🔥 IMPORTANT: use SUM(seat_count), not COUNT(*)
+    // use SUM(seat_count), not COUNT(*)
     const bookRes = await pool.query(
       `
       SELECT COALESCE(

@@ -1,4 +1,5 @@
 // backend/routes/calWebhookRoutes.js
+
 import express from "express";
 import { pool } from "../db.js";
 import { normalizeCalBooking } from "./bookingRoutes.js";
@@ -58,13 +59,13 @@ router.post("/", async (req, res) => {
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error("[Cal webhook] Handler error:", err);
-    // Always 200 so Cal doesn’t spam retries
+    // always 200 so Cal doesn't spam retries
     return res.status(200).json({ ok: false });
   }
 });
 
 /* ============================================================
-   HELPERS — Find program by eventTypeId or slug
+   HELPERS — Map eventTypeId or slug → program.id
 ============================================================ */
 async function findProgramForWebhook(payload) {
   const eventTypeId =
@@ -97,7 +98,7 @@ async function findProgramForWebhook(payload) {
     if (r2.rows.length > 0) return r2.rows[0].id;
   }
 
-  console.warn("[Cal webhook] Could not map payload to a program:", {
+  console.warn("[Cal webhook] Could not map payload to program:", {
     eventTypeId,
     slug,
   });
@@ -106,8 +107,50 @@ async function findProgramForWebhook(payload) {
 }
 
 /* ============================================================
+   Resolve user_id from booking:
+   1) metadata.userId / metadata.memberId (if valid)
+   2) email lookup in users table
+============================================================ */
+async function resolveUserIdFromBooking(norm) {
+  let userId = null;
+
+  // 1) metadata userId/memberId
+  if (norm.user_id) {
+    try {
+      const idNum = Number(norm.user_id);
+      if (Number.isFinite(idNum) && idNum > 0) {
+        const r = await pool.query(
+          "SELECT id FROM users WHERE id = $1 LIMIT 1",
+          [idNum]
+        );
+        if (r.rows.length > 0) {
+          userId = r.rows[0].id;
+        }
+      }
+    } catch (e) {
+      console.warn("[Cal webhook] Failed to use metadata userId:", norm.user_id);
+    }
+  }
+
+  // 2) email lookup if still null
+  if (!userId && norm.attendee_email) {
+    const email = norm.attendee_email.trim().toLowerCase();
+    if (email) {
+      const r2 = await pool.query(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+        [email]
+      );
+      if (r2.rows.length > 0) {
+        userId = r2.rows[0].id;
+      }
+    }
+  }
+
+  return userId;
+}
+
+/* ============================================================
    BOOKING_CREATED
-   - Uses normalizeCalBooking to derive seat_count
 ============================================================ */
 async function handleBookingCreated(payload) {
   const norm = normalizeCalBooking(payload);
@@ -132,15 +175,23 @@ async function handleBookingCreated(payload) {
   const start = norm.event_start || null;
   const end = norm.event_end || null;
 
+  // seat count
   const seatCount =
-    typeof norm.seat_count === "number" && norm.seat_count > 0
-      ? norm.seat_count
-      : 1;
+    Array.isArray(payload?.attendees) && payload.attendees.length > 0
+      ? payload.attendees.length
+      : norm.seat_count || 1;
+
+  // 🔍 map to users.user_id
+  const userId = await resolveUserIdFromBooking({
+    ...norm,
+    attendee_email: attendeeEmail,
+  });
 
   await pool.query(
     `
     INSERT INTO bookings (
       program_id,
+      user_id,
       cal_booking_id,
       event_start,
       event_end,
@@ -151,10 +202,11 @@ async function handleBookingCreated(payload) {
       raw,
       created_at
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,'ACCEPTED',$8,NOW())
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACCEPTED',$9,NOW())
     ON CONFLICT (cal_booking_id)
     DO UPDATE SET
       program_id     = EXCLUDED.program_id,
+      user_id        = EXCLUDED.user_id,
       event_start    = EXCLUDED.event_start,
       event_end      = EXCLUDED.event_end,
       attendee_name  = EXCLUDED.attendee_name,
@@ -165,6 +217,7 @@ async function handleBookingCreated(payload) {
     `,
     [
       programId,
+      userId, // may be null if no user matched – that's fine
       uid,
       start,
       end,
@@ -180,6 +233,8 @@ async function handleBookingCreated(payload) {
     uid,
     "→ program",
     programId,
+    "user_id=",
+    userId,
     "seats=",
     seatCount
   );
