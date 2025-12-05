@@ -86,7 +86,7 @@ router.get("/", async (req, res) => {
    - normal user: can ONLY view their own bookings
    - admin: can view any userId
 ============================================================ */
-router.get("/user/:userId", auth, async (req, res) => {
+router.get("/user/:userId", async (req, res) => {
   try {
     if (!req.user) {
       return res
