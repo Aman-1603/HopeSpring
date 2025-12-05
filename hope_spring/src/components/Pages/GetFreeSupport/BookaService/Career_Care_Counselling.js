@@ -1,5 +1,6 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import axios from "axios";
 import {
   CalendarCheck2,
   Info,
@@ -8,6 +9,7 @@ import {
   Home,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "../../../../contexts/AuthContext"; // <-- use same path as ProgramTemplate if this fails
 
 /* Replace with your local assets */
 const heroRight =
@@ -17,13 +19,18 @@ const groupImg =
 const benefitsImg =
   "https://images.unsplash.com/photo-1493836512294-502baa1986e2?q=80&w=1200&auto=format&fit=crop";
 
+const PROGRAMS_API = "/api/programs";
+
+const normalize = (v) =>
+  (v || "").trim().toLowerCase().replace(/\s+/g, "_");
+
 const SubPill = ({ children, to = "#" }) => (
-  <Link
-    to={to}
+  <a
+    href={to}
     className="inline-flex items-center justify-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
   >
     {children}
-  </Link>
+  </a>
 );
 
 const ServiceCard = ({ icon: Icon, title, children }) => (
@@ -55,7 +62,110 @@ const CounselorCard = ({ name, img }) => (
   </div>
 );
 
+/* ===== Cal modal (same pattern as ProgramTemplate) ===== */
+
+function CalBookingModal({ open, onClose, calUser, calSlug, name, email, userId }) {
+  if (!open || !calUser || !calSlug) return null;
+
+  const user = String(calUser).trim();
+  const slug = String(calSlug).trim();
+
+  const params = new URLSearchParams();
+  params.set("embed", "1");
+  if (name) params.set("name", name);
+  if (email) params.set("email", email);
+  if (userId) params.set("metadata[userId]", String(userId));
+
+  const src = `https://app.cal.com/${user}/${slug}?${params.toString()}`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+      <div className="relative w-[95vw] h-[95vh] bg-white rounded-2xl overflow-hidden shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 inline-flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm w-10 h-10 hover:bg-slate-50"
+          aria-label="Close booking"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-700">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+        <iframe
+          title="Request counselling time"
+          src={src}
+          className="w-full h-full border-0"
+          loading="lazy"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function CancerCareCounselling() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  const [program, setProgram] = useState(null);
+  const [loadingProgram, setLoadingProgram] = useState(true);
+  const [bookingOpen, setBookingOpen] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await axios.get(PROGRAMS_API);
+        const all = res.data || [];
+
+        // pick first program with category "Counselling" (case-insensitive)
+        const counsellingPrograms = all.filter(
+          (p) => normalize(p.category) === "counselling"
+        );
+        setProgram(counsellingPrograms[0] || null);
+      } catch (err) {
+        console.error("Failed to load counselling program:", err);
+      } finally {
+        setLoadingProgram(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleBookClick = () => {
+    if (!user) {
+      const redirect = encodeURIComponent(location.pathname);
+      window.location.href = `/login?redirect=${redirect}`;
+      return;
+    }
+
+    if (
+      !program ||
+      !program.cal_user ||
+      !program.cal_slug ||
+      !program.cal_event_type_id
+    ) {
+      window.alert("Counselling bookings are not open yet. Please check back soon.");
+      return;
+    }
+
+    setBookingOpen(true);
+  };
+
+  const memberName = user?.fullName || user?.name || "";
+  const memberEmail = user?.email || "";
+  const memberId = user?.id || null;
+
+  const bookingDisabled =
+    loadingProgram ||
+    !program ||
+    !program.cal_user ||
+    !program.cal_slug ||
+    !program.cal_event_type_id;
+
   return (
     <main className="text-gray-900">
       {/* HERO (split) */}
@@ -75,13 +185,23 @@ export default function CancerCareCounselling() {
             </p>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Link
-                to="/booking/counselling"
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2"
+              <button
+                type="button"
+                onClick={handleBookClick}
+                disabled={bookingDisabled}
+                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 ${
+                  bookingDisabled
+                    ? "bg-gray-300 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
               >
                 <CalendarCheck2 className="h-4 w-4" />
-                Book Appointment
-              </Link>
+                {loadingProgram
+                  ? "Checking availability…"
+                  : bookingDisabled
+                  ? "Not yet open"
+                  : "Request Counselling Time"}
+              </button>
 
               <a
                 href="https://iccs-example.org"
@@ -130,7 +250,7 @@ export default function CancerCareCounselling() {
       {/* INTRO & BENEFITS */}
       <section className="mx-auto max-w-6xl px-6 py-8">
         <div className="grid items-start gap-10 md:grid-cols-2">
-          <div>
+          <div id="individual">
             <h2 className="text-xl font-extrabold">
               What is Cancer Care Counselling?
             </h2>
@@ -142,12 +262,18 @@ export default function CancerCareCounselling() {
               families.
             </p>
             <div className="mt-5">
-              <Link
-                to="/booking/counselling"
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              <button
+                type="button"
+                onClick={handleBookClick}
+                disabled={bookingDisabled}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white ${
+                  bookingDisabled
+                    ? "bg-gray-300 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
               >
-                Book Appointment <ChevronRight className="h-4 w-4" />
-              </Link>
+                Request Counselling Time <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
@@ -167,7 +293,7 @@ export default function CancerCareCounselling() {
             />
           </div>
 
-          <div className="md:order-3">
+          <div className="md:order-3" id="safe-space">
             <h3 className="text-xl font-extrabold">
               Potential Benefits of Counselling
             </h3>
@@ -191,12 +317,18 @@ export default function CancerCareCounselling() {
           remove barriers to access.
         </p>
         <div className="mt-4 flex gap-3">
-          <Link
-            to="/booking/counselling"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          <button
+            type="button"
+            onClick={handleBookClick}
+            disabled={bookingDisabled}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white ${
+              bookingDisabled
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-emerald-600 hover:bg-emerald-700"
+            }`}
           >
-            Book Appointment
-          </Link>
+            Request Counselling Time
+          </button>
           <Link
             to="/contact"
             className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-gray-50"
@@ -229,7 +361,7 @@ export default function CancerCareCounselling() {
       </section>
 
       {/* TYPES OF SERVICES */}
-      <section className="bg-gray-50 py-12">
+      <section className="bg-gray-50 py-12" id="child-youth">
         <div className="mx-auto max-w-6xl px-6 text-center md:text-left">
           <h3 className="text-xl font-extrabold">Types Of Counselling Services</h3>
           <p className="mt-2 text-sm text-gray-700">
@@ -258,12 +390,18 @@ export default function CancerCareCounselling() {
           </div>
 
           <div className="mt-6">
-            <Link
-              to="/booking/counselling"
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            <button
+              type="button"
+              onClick={handleBookClick}
+              disabled={bookingDisabled}
+              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+                bookingDisabled
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
             >
-              Book Appointment <ChevronRight className="h-4 w-4" />
-            </Link>
+              Request Counselling Time <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
@@ -355,6 +493,16 @@ export default function CancerCareCounselling() {
           </div>
         </div>
       </section>
+
+      <CalBookingModal
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        calUser={program?.cal_user}
+        calSlug={program?.cal_slug}
+        name={memberName}
+        email={memberEmail}
+        userId={memberId}
+      />
     </main>
   );
 }

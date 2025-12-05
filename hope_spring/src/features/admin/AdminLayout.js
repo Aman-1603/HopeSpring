@@ -15,7 +15,9 @@ import {
   BarChart3,
   MessageSquare,
   Settings,
-  ListChecks
+  ListChecks,
+  Clock,
+  ShoppingBag
 } from "lucide-react";
 
 const adminNavItems = [
@@ -29,7 +31,10 @@ const adminNavItems = [
   { name: "Bookings", path: "/admin/FetchBooking", icon: BarChart3 },
   { name: "Communication", path: "/admin/AdminSupport", icon: MessageSquare },
   { name: "Waitlist", path: "/admin/waitlist", icon: ListChecks },
+  { name: "Pending", path: "/admin/pending-bookings", icon: Clock },
   { name: "Settings", path: "/admin/settings", icon: Settings },
+  { name: "Boutique Requests", path: "/admin/boutique-requests", icon: ShoppingBag },
+
 ];
 
 const AdminLayout = ({ children }) => {

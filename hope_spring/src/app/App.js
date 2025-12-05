@@ -45,6 +45,7 @@ import OurTeam from "../components/Pages/About/Team";
 import BoardOfDirectors from "../components/Pages/About/BDirector";
 import DonorPartners from "../components/Pages/About/Donor";
 import Reports from "../components/Pages/About/Report";
+import WigsCamisolesHeadcovers from "../components/Pages/GetFreeSupport/BookaService/WigsCamisolesHeadcovers";
 
 // Admin Section
 import AdminDashboard from "../features/admin/pages/AdminDashboard";
@@ -56,6 +57,9 @@ import AdminSettings from "../features/admin/pages/AdminSettings";
 import Announcements from "../features/admin/pages/Announcements";
 import DonateSuccess from "../components/Pages/DonateSuccess";
 import AdminWaitlist from "../features/admin/pages/AdminWaitlist";
+import AdminPendingBookings from "../features/admin/pages/AdminPendingBooking";
+import AdminBoutiqueRequests from "../features/admin/pages/AdminBoutiqueRequests";
+
 
 // User Section
 import UserDashboard from "../features/user/pages/UserDashboard";
@@ -334,6 +338,23 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+  path="/admin/pending-bookings"
+  element={<AdminPendingBookings />}
+/>
+
+<Route
+  path="/book/wigs-camisoles-headcovers"
+  element={<WigsCamisolesHeadcovers />}
+/>
+
+<Route
+  path="/admin/boutique-requests"
+  element={<AdminBoutiqueRequests />}
+/>
+
+
 
           {/* For payment success page */}
           <Route path="/donate/success" element={<DonateSuccess />} />

@@ -78,7 +78,10 @@ const ProgramCard = ({
   isFull = false,
   onJoinWaitlist,
   fullDates = [],
+  mode = "default", // "default" | "counselling"
 }) => {
+  const isCounselling = mode === "counselling";
+
   const occs = p.occurrences || [];
 
   const hasCalDates = calDates && calDates.length > 0;
@@ -119,7 +122,8 @@ const ProgramCard = ({
         )}
       </p>
 
-      {(hasCalDates || occs.length > 0) && (
+      {/* For counselling: do NOT show date pills – Cal handles availability */}
+      {!isCounselling && (hasCalDates || occs.length > 0) && (
         <div className="mt-3 flex flex-wrap gap-2">
           {hasCalDates
             ? showCalDates.map((d) => (
@@ -132,8 +136,8 @@ const ProgramCard = ({
         </div>
       )}
 
-      {/* Small text for specific full dates */}
-      {uniqueFullDates.length > 0 && (
+      {/* Full-date text – only relevant for group programs, not counselling */}
+      {!isCounselling && uniqueFullDates.length > 0 && (
         <p className="mt-2 text-xs text-amber-700">
           {fullDatesLabel} {uniqueFullDates.length === 1 ? "is" : "are"} full.
           You can join the waitlist for those dates.
@@ -148,6 +152,15 @@ const ProgramCard = ({
           className="mt-4 inline-block rounded-lg bg-gray-200 text-gray-600 px-4 py-2 text-sm font-semibold cursor-not-allowed"
         >
           Not yet open
+        </button>
+      ) : isCounselling ? (
+        // Counselling: always "Request Counselling Time", no waitlist/full logic
+        <button
+          type="button"
+          onClick={() => onRegister && onRegister(p)}
+          className="mt-4 inline-block rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold hover:bg-emerald-700"
+        >
+          Request Counselling Time
         </button>
       ) : isFull ? (
         // All dates full → only waitlist
@@ -270,6 +283,9 @@ export default function ProgramTemplate({ config }) {
     faqAlt,
   } = config || {};
 
+  const normalizedCategoryName = normalize(categoryName);
+  const isCounsellingCategory = normalizedCategoryName === "counselling";
+
   const loggedInUser = user || null;
   const authToken = token || null;
 
@@ -385,8 +401,14 @@ export default function ProgramTemplate({ config }) {
   useEffect(() => {
     if (!programs || programs.length === 0) return;
 
-    if (!authToken) {
+    // Counselling: we don't care about capacity / summary at all
+    if (isCounsellingCategory) {
       setSummaryByProgram({});
+      return;
+    }
+
+    if (!authToken) {
+      setSummaryByProgram({}); // but summaries aren't used heavily anymore
       return;
     }
 
@@ -397,14 +419,11 @@ export default function ProgramTemplate({ config }) {
         const results = await Promise.all(
           programs.map(async (p) => {
             try {
-              const res = await axios.get(
-                `${BOOKINGS_API}/${p.id}/summary`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${authToken}`,
-                  },
-                }
-              );
+              const res = await axios.get(`${BOOKINGS_API}/${p.id}/summary`, {
+                headers: {
+                  Authorization: `Bearer ${authToken}`,
+                },
+              });
               return [p.id, res.data];
             } catch (err) {
               console.error("summary fetch failed for program", p.id, err);
@@ -429,11 +448,18 @@ export default function ProgramTemplate({ config }) {
     return () => {
       cancelled = true;
     };
-  }, [programs, authToken]);
+  }, [programs, authToken, isCounsellingCategory]);
 
   /* ---- load slot-usage (per-date capacity) for each program ---- */
   useEffect(() => {
     if (!programs || programs.length === 0) return;
+
+    // Counselling: we are not doing per-slot capacity / "full" logic
+    if (isCounsellingCategory) {
+      setSlotUsageByProgram({});
+      return;
+    }
+
     if (!authToken) {
       setSlotUsageByProgram({});
       return;
@@ -478,10 +504,12 @@ export default function ProgramTemplate({ config }) {
     return () => {
       cancelled = true;
     };
-  }, [programs, authToken]);
+  }, [programs, authToken, isCounsellingCategory]);
 
   /* ---- derive full dates per program from slot-usage ---- */
   const getFullDatesForProgram = (programId) => {
+    if (isCounsellingCategory) return []; // counselling ignores this
+
     const usage = slotUsageByProgram[programId];
     if (!usage || !Array.isArray(usage.slots)) return [];
 
@@ -512,6 +540,8 @@ export default function ProgramTemplate({ config }) {
   );
 
   const openBookingFor = (p) => {
+    // If you want counselling to be open without login, we can relax this,
+    // but for now we keep same behavior as other programs.
     if (!loggedInUser || !authToken) {
       redirectToLogin();
       return;
@@ -685,13 +715,17 @@ export default function ProgramTemplate({ config }) {
         className="max-w-6xl mx-auto px-4 py-10 scroll-mt-24"
       >
         <SectionTitle
-          title={`${subcategoryName} programs for the cancer community`}
+          title={
+            isCounsellingCategory
+              ? "Counselling options available"
+              : `${subcategoryName} programs for the cancer community`
+          }
         />
 
         {!loggedInUser && (
           <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block">
             Please log in to register or join a waitlist. You’ll be redirected
-            to the login page if you click “Register here” or “Join waitlist”.
+            to the login page if you click a booking button.
           </p>
         )}
 
@@ -724,11 +758,12 @@ export default function ProgramTemplate({ config }) {
                     dates: [],
                     slots: [],
                   };
-                  const fullDates = getFullDatesForProgram(p.id);
 
-                  // Cal dates from Cal slots endpoint
+                  const fullDates = isCounsellingCategory
+                    ? []
+                    : getFullDatesForProgram(p.id);
+
                   const calDates = slotInfo.dates || [];
-                  // Fallback to DB occurrence dates if no Cal dates
                   const occDates = (p.occurrences || [])
                     .map((o) => (o.starts_at || "").substring(0, 10))
                     .filter(Boolean);
@@ -736,14 +771,15 @@ export default function ProgramTemplate({ config }) {
                   const allDates = calDates.length > 0 ? calDates : occDates;
                   const fullSet = new Set(fullDates);
 
-                  // true if there is at least one date that is NOT full
                   const hasBookableDate = allDates.some(
                     (d) => !fullSet.has(d)
                   );
 
-                  // For UI: "full" means there are dates but none are bookable
                   const isUiFull =
-                    linked && allDates.length > 0 && !hasBookableDate;
+                    !isCounsellingCategory &&
+                    linked &&
+                    allDates.length > 0 &&
+                    !hasBookableDate;
 
                   return (
                     <ProgramCard
@@ -753,8 +789,9 @@ export default function ProgramTemplate({ config }) {
                       onRegister={openBookingFor}
                       calDates={slotInfo.dates}
                       isFull={isUiFull}
-                      onJoinWaitlist={joinWaitlistFor}
+                      onJoinWaitlist={isCounsellingCategory ? undefined : joinWaitlistFor}
                       fullDates={fullDates}
+                      mode={isCounsellingCategory ? "counselling" : "default"}
                     />
                   );
                 })}
@@ -772,7 +809,10 @@ export default function ProgramTemplate({ config }) {
                     dates: [],
                     slots: [],
                   };
-                  const fullDates = getFullDatesForProgram(p.id);
+
+                  const fullDates = isCounsellingCategory
+                    ? []
+                    : getFullDatesForProgram(p.id);
 
                   const calDates = slotInfo.dates || [];
                   const occDates = (p.occurrences || [])
@@ -785,7 +825,10 @@ export default function ProgramTemplate({ config }) {
                     (d) => !fullSet.has(d)
                   );
                   const isUiFull =
-                    linked && allDates.length > 0 && !hasBookableDate;
+                    !isCounsellingCategory &&
+                    linked &&
+                    allDates.length > 0 &&
+                    !hasBookableDate;
 
                   return (
                     <ProgramCard
@@ -795,8 +838,9 @@ export default function ProgramTemplate({ config }) {
                       onRegister={openBookingFor}
                       calDates={slotInfo.dates}
                       isFull={isUiFull}
-                      onJoinWaitlist={joinWaitlistFor}
+                      onJoinWaitlist={isCounsellingCategory ? undefined : joinWaitlistFor}
                       fullDates={fullDates}
+                      mode={isCounsellingCategory ? "counselling" : "default"}
                     />
                   );
                 })}

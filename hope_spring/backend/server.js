@@ -18,6 +18,8 @@ import supportRoutes from "./routes/supportRoutes.js";
 import adminSupportRoutes from "./routes/adminSupportRoutes.js";
 import waitlistRoutes from "./routes/waitlistRoutes.js";
 import adminBookingsRoute from "./routes/adminBookings.js";
+import boutiqueRoutes from "./routes/boutiqueRoutes.js";
+
 
 dotenv.config();
 
@@ -260,6 +262,7 @@ app.use("/api/admin/support", adminSupportRoutes);
 app.use("/api/admin/bookings", adminBookingsRoute);
 app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
+app.use("/api/boutique", requireAuth, boutiqueRoutes);
 
 /* ------------------------------------------
    🚨 BOOKINGS REQUIRE LOGIN
