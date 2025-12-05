@@ -1,22 +1,36 @@
 // src/components/Header.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { NavLink, Link, useLocation } from "react-router-dom";
+import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import LanguageDropdown from "../shared/LanguageDropdown";
 import axios from "axios";
-import { Bell } from "lucide-react";
+import { Bell, User as UserIcon } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
+import { set } from "date-fns";
 /* -------------------------------- MENU DATA -------------------------------- */
 const MENU = [
   {
     key: "getStarted",
     label: "Get Started",
     children: [
-      { label: "I am living with cancer or I am a survivor", to: "/get-started/living-with-cancer" },
-      { label: "I am a caregiver, supporter, or family member", to: "/get-started/caregiver-family" },
-      { label: "I am a healthcare provider or community partner", to: "/get-started/provider-partner" },
-      { label: "I want to give or volunteer", to: "/get-started/give-or-volunteer" }
-    ]
+      {
+        label: "I am living with cancer or I am a survivor",
+        to: "/get-started/living-with-cancer",
+      },
+      {
+        label: "I am a caregiver, supporter, or family member",
+        to: "/get-started/caregiver-family",
+      },
+      {
+        label: "I am a healthcare provider or community partner",
+        to: "/get-started/provider-partner",
+      },
+      {
+        label: "I want to give or volunteer",
+        to: "/get-started/give-or-volunteer",
+      },
+    ],
   },
   {
     key: "getFreeSupport",
@@ -30,40 +44,78 @@ const MENU = [
           {
             label: "Gentle Exercise",
             children: [
-              { label: "Meditation", to: "/support/programs/gentle-exercise/meditation" },
+              {
+                label: "Meditation",
+                to: "/support/programs/gentle-exercise/meditation",
+              },
               { label: "Yoga", to: "/support/programs/gentle-exercise/yoga" },
-              { label: "Tai Chi", to: "/support/programs/gentle-exercise/tai-chi" },
-              { label: "Qi Gong", to: "/support/programs/gentle-exercise/qi-gong" }
-            ]
+              {
+                label: "Tai Chi",
+                to: "/support/programs/gentle-exercise/tai-chi",
+              },
+              {
+                label: "Qi Gong",
+                to: "/support/programs/gentle-exercise/qi-gong",
+              },
+            ],
           },
-          { label: "Children/Youth/Families", to: "/support/programs/children-youth-families" },
-          { label: "Coping", children: [{ label: "Chemo brain", to: "/support/programs/coping/chemo-brain" }] },
+          {
+            label: "Children/Youth/Families",
+            to: "/support/programs/children-youth-families",
+          },
+          {
+            label: "Coping",
+            children: [
+              {
+                label: "Chemo brain",
+                to: "/support/programs/coping/chemo-brain",
+              },
+            ],
+          },
           {
             label: "Arts and Creativity",
             children: [
-              { label: "Joyful Art Practice", to: "/support/programs/arts-creativity/joyful-art-practice" },
-              { label: "Joyful Art Skills & Techniques", to: "/support/programs/arts-creativity/joyful-art-skills" }
-            ]
+              {
+                label: "Joyful Art Practice",
+                to: "/support/programs/arts-creativity/joyful-art-practice",
+              },
+              {
+                label: "Joyful Art Skills & Techniques",
+                to: "/support/programs/arts-creativity/joyful-art-skills",
+              },
+            ],
           },
           {
             label: "Relaxation",
             children: [
-              { label: "Massage Therapy", to: "/support/programs/relaxation/massage-therapy" },
-              { label: "Therapeutic Touch", to: "/support/programs/relaxation/therapeutic-touch" },
-              { label: "Reiki", to: "/support/programs/relaxation/reiki" }
-            ]
-          }
-        ]
+              {
+                label: "Massage Therapy",
+                to: "/support/programs/relaxation/massage-therapy",
+              },
+              {
+                label: "Therapeutic Touch",
+                to: "/support/programs/relaxation/therapeutic-touch",
+              },
+              { label: "Reiki", to: "/support/programs/relaxation/reiki" },
+            ],
+          },
+        ],
       },
       {
         label: "Book a Service",
         children: [
-          { label: "Cancer Care Counselling", to: "/book/cancer-care-counselling" },
-          { label: "Wigs, Camisoles, Headcovers", to: "/book/wigs-camisoles-headcovers" }
-        ]
+          {
+            label: "Cancer Care Counselling",
+            to: "/book/cancer-care-counselling",
+          },
+          {
+            label: "Wigs, Camisoles, Headcovers",
+            to: "/book/wigs-camisoles-headcovers",
+          },
+        ],
       },
-      { label: "Resources", to: "/resources" }
-    ]
+      { label: "Resources", to: "/resources" },
+    ],
   },
   {
     key: "getInvolved",
@@ -76,11 +128,11 @@ const MENU = [
         label: "Fundraise",
         children: [
           { label: "Fundraising", to: "/fundraise" },
-          { label: "Lifeafterme", to: "/fundraise/lifeafterme" }
-        ]
+          { label: "Lifeafterme", to: "/fundraise/lifeafterme" },
+        ],
       },
-      { label: "Legacy Giving", to: "/legacy-giving" }
-    ]
+      { label: "Legacy Giving", to: "/legacy-giving" },
+    ],
   },
   { key: "getInspired", label: "Get Inspired", to: "/get-inspired" },
   {
@@ -92,9 +144,9 @@ const MENU = [
       { label: "Our Team", to: "/our-team" },
       { label: "Board of Directors", to: "/board-of-directors" },
       { label: "Donors & Partners", to: "/donors-and-partners" },
-      { label: "Reports", to: "/reports" }
-    ]
-  }
+      { label: "Reports", to: "/reports" },
+    ],
+  },
 ];
 
 /* ---------------------------- Active route helper --------------------------- */
@@ -108,13 +160,23 @@ function hasActiveDescendant(item, pathname) {
 export default function Header() {
   const { pathname } = useLocation();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef(null);
 
+  const handleLogout = () => {
+    localStorage.removeItem("hs_token");
+    logout();
+    setProfileOpen(false);
+    navigate("/login");
+  };
   /* -------------------- NOTIFICATIONS (Announcements) -------------------- */
   const [notifications, setNotifications] = useState([]);
   const [showNotif, setShowNotif] = useState(false);
+  const notifRef = useRef();
 
   useEffect(() => {
     const loadAnnouncements = async () => {
@@ -129,13 +191,18 @@ export default function Header() {
     loadAnnouncements();
   }, []);
 
-  const notifRef = useRef();
+  /* --------------------------- PROFILE DROPDOWN --------------------------- */
+  const profileRef = useRef();
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
         setShowNotif(false);
       }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -164,7 +231,6 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-200">
-
       {/* --------------------------- TOP UTILITY BAR --------------------------- */}
       <div className="hidden md:block border-b border-gray-200 bg-white/90">
         <div className="mx-auto max-w-6xl h-9 px-4 flex items-center justify-between">
@@ -177,18 +243,19 @@ export default function Header() {
 
       {/* ------------------------------- MAIN ROW ------------------------------ */}
       <div className="mx-auto max-w-6xl h-16 px-4 flex items-center justify-between">
-
         {/* LOGO */}
         <Link to="/" className="block w-[210px] md:w-[240px] h-12">
-          <img src="/images/logo2.png" alt="HopeSpring Logo" className="w-full h-full object-contain" />
+          <img
+            src="/images/logo2.png"
+            alt="HopeSpring Logo"
+            className="w-full h-full object-contain"
+          />
         </Link>
 
         {/* ------------------------------ DESKTOP NAV ----------------------------- */}
         <nav className="hidden md:flex items-center justify-between flex-1">
-
           {/* LEFT SIDE — Donate + Menu */}
           <div className="flex items-center gap-6">
-
             {/* DONATE BUTTON */}
             <NavLink
               to="/donate"
@@ -219,7 +286,11 @@ export default function Header() {
                           viewBox="0 0 24 24"
                           fill="none"
                         >
-                          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+                          <path
+                            d="M6 9l6 6 6-6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          />
                         </svg>
                       </button>
                     ) : (
@@ -227,7 +298,9 @@ export default function Header() {
                         to={item.to}
                         className={({ isActive }) =>
                           `px-3 py-2 hover:text-black ${
-                            isActive ? "text-black font-semibold underline underline-offset-4" : ""
+                            isActive
+                              ? "text-black font-semibold underline underline-offset-4"
+                              : ""
                           }`
                         }
                       >
@@ -250,43 +323,122 @@ export default function Header() {
             </ul>
           </div>
 
-          {/* RIGHT SIDE — Notification Bell */}
-          <div className="relative ml-6" ref={notifRef}>
-            <button
-              onClick={() => setShowNotif((prev) => !prev)}
-              className="relative p-2 hover:bg-gray-100 rounded-full"
-            >
-              <Bell className="w-6 h-6 text-gray-700" />
-              {notifications.length > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+          {/* RIGHT SIDE — Notifications + Auth */}
+          <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotif((prev) => !prev)}
+                className="relative p-2 hover:bg-gray-100 rounded-full"
+              >
+                <Bell className="w-6 h-6 text-gray-700" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+                )}
+              </button>
+
+              {showNotif && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border rounded-xl shadow-xl z-50 p-4">
+                  <h3 className="font-semibold text-gray-800 mb-2">
+                    Announcements
+                  </h3>
+
+                  {notifications.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      No announcements at this time.
+                    </p>
+                  ) : (
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className="p-2 rounded-lg border border-gray-100 bg-gray-50"
+                        >
+                          <p className="text-sm font-medium text-gray-800">
+                            {n.title}
+                          </p>
+                          {n.summary && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              {n.summary}
+                            </p>
+                          )}
+                          {n.link && (
+                            <a
+                              href={n.link}
+                              className="text-indigo-600 text-xs mt-1 inline-block"
+                            >
+                              View →
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
+            </div>
 
-            {showNotif && (
-              <div className="absolute right-0 mt-2 w-80 bg-white border rounded-xl shadow-xl z-50 p-4">
-                <h3 className="font-semibold text-gray-800 mb-2">Announcements</h3>
+            {/* Auth: Login / Profile */}
+            {!user ? (
+              <button
+                onClick={() => navigate("/login")}
+                className="px-5 py-2.5 rounded-full text-sm font-semibold
+                           bg-blue-600 text-white shadow-sm
+                           hover:bg-blue-700 hover:shadow-md
+                           active:scale-[0.98] transition"
+              >
+                Log in
+              </button>
+            ) : (
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setProfileOpen((prev) => !prev)}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200"
+                >
+                  {/* Initial or icon */}
+                  {user.firstName || user.name || user.email ? (
+                    <span className="text-sm font-semibold text-[#0e2340]">
+                      {(user.firstName ||
+                        user.name ||
+                        user.email)[0].toUpperCase()}
+                    </span>
+                  ) : (
+                    <UserIcon className="w-5 h-5 text-gray-700" />
+                  )}
+                </button>
 
-                {notifications.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No announcements available</p>
-                ) : (
-                  <div className="space-y-3 max-h-80 overflow-y-auto">
-                    {notifications.map((n) => (
-                      <div key={n.id} className="border-b pb-2 last:border-none">
-                        <p className="font-semibold">{n.title}</p>
-                        <p className="text-sm text-gray-600">{n.description}</p>
-                        {n.link && (
-                          <a href={n.link} className="text-indigo-600 text-sm">
-                            View →
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-44 bg-white border rounded-xl shadow-lg z-50 py-2 text-sm">
+                    <button
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate("/user/dashboard");
+                      }}
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate("/user/profile");
+                      }}
+                    >
+                      My Profile
+                    </button>
+                    <div className="border-t my-1" />
+                    <button
+                      className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50"
+                      onClick={handleLogout}
+                    >
+                      Logout
+                    </button>
                   </div>
                 )}
               </div>
             )}
           </div>
-
         </nav>
 
         {/* ------------------------------ MOBILE MENU BUTTON ----------------------------- */}
@@ -296,24 +448,114 @@ export default function Header() {
         >
           Menu
         </button>
-
       </div>
 
       {/* ------------------------------- MOBILE MENU ------------------------------ */}
       <div
         ref={navRef}
-        className={`md:hidden bg-white overflow-hidden transition ${mobileOpen ? "max-h-[80vh]" : "max-h-0"}`}
+        className={`md:hidden bg-white overflow-hidden transition ${
+          mobileOpen ? "max-h-[80vh]" : "max-h-0"
+        }`}
       >
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          <LanguageDropdown />
-          <NavLink
-            to="/donate"
-            className="block mt-3 rounded-xl bg-[#0e2340] text-white px-4 py-2 text-sm font-semibold"
-          >
-            {t("menu.common.donate")}
-          </NavLink>
+        <div
+          ref={navRef}
+          className={`md:hidden bg-white overflow-hidden transition ${
+            mobileOpen ? "max-h-[80vh]" : "max-h-0"
+          }`}
+        >
+          <div className="max-w-6xl mx-auto px-4 py-3 space-y-3">
+            {/* Language + Donate in one row */}
+            <div className="flex items-center justify-between gap-3">
+              <LanguageDropdown />
 
-          <MobileMenu items={MENU} />
+              <NavLink
+                to="/donate"
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex items-center justify-center
+                 rounded-full bg-[#0e2340] text-white
+                 px-4 py-2 text-xs font-semibold
+                 whitespace-nowrap shadow-sm
+                 hover:brightness-110 active:scale-[0.98] transition"
+              >
+                {t("menu.common.donate")}
+              </NavLink>
+            </div>
+
+            {/* Mobile menu tree */}
+            <MobileMenu items={MENU} />
+
+            {/* 🔹 Mobile auth section */}
+            <div className="mt-4 pt-3 border-t flex flex-col gap-2">
+              {!user ? (
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    navigate("/login");
+                  }}
+                  className="w-full px-4 py-2.5 rounded-full text-sm font-semibold
+                           bg-blue-600 text-white shadow-sm
+                           hover:bg-blue-700 hover:shadow-md
+                           active:scale-[0.98] transition"
+                >
+                  Log in
+                </button>
+              ) : (
+                <>
+                  {/* Profile mini header */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
+                      {user.firstName || user.name || user.email ? (
+                        <span className="text-sm font-semibold text-[#0e2340]">
+                          {(user.firstName ||
+                            user.name ||
+                            user.email)[0].toUpperCase()}
+                        </span>
+                      ) : (
+                        <UserIcon className="w-5 h-5 text-gray-700" />
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {user.firstName || user.name || "Member"}
+                      </span>
+                      <span className="text-xs text-gray-500 truncate max-w-[180px]">
+                        {user.email}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Profile actions */}
+                  <button
+                    onClick={() => {
+                      setMobileOpen(false);
+                      navigate("/user/dashboard");
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    Dashboard
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobileOpen(false);
+                      navigate("/user/profile");
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    My Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobileOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Logout
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -341,11 +583,18 @@ function DesktopMenuPanel({ items }) {
               <button className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-gray-50">
                 {it.label}
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" />
+                  <path
+                    d="M9 6l6 6-6 6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
                 </svg>
               </button>
             ) : (
-              <NavLink to={it.to} className="block px-3 py-2 rounded-lg hover:bg-gray-50">
+              <NavLink
+                to={it.to}
+                className="block px-3 py-2 rounded-lg hover:bg-gray-50"
+              >
                 {it.label}
               </NavLink>
             )}
@@ -380,20 +629,30 @@ function MobileMenu({ items, level = 0 }) {
                   {it.label}
                 </NavLink>
               ) : (
-                <button className="flex-1 text-left px-3 py-2.5" onClick={() => setOpenIndex(open ? null : idx)}>
+                <button
+                  className="flex-1 text-left px-3 py-2.5"
+                  onClick={() => setOpenIndex(open ? null : idx)}
+                >
                   {it.label}
                 </button>
               )}
 
               {hasChildren && (
-                <button className="px-3 py-2.5" onClick={() => setOpenIndex(open ? null : idx)}>
+                <button
+                  className="px-3 py-2.5"
+                  onClick={() => setOpenIndex(open ? null : idx)}
+                >
                   <svg
                     className={`transition ${open ? "rotate-180" : ""}`}
                     width="18"
                     height="18"
                     fill="none"
                   >
-                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" />
+                    <path
+                      d="M6 9l6 6 6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
                   </svg>
                 </button>
               )}
