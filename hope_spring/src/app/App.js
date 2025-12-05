@@ -70,6 +70,7 @@ import Support from "../components/Pages/Support/UsersSupport";
 import AdminSupport from "../features/admin/pages/AdminSupport";
 import AdminBookings from "../features/admin/pages/AdminBookingFetch";
 import FaciliatorDashboard from "../features/facilitator/FacilitatorDashboard.js"
+import AdminDonations from "../features/admin/pages/AdminDonation";
 
 export default function App() {
   const location = useLocation();
@@ -304,6 +305,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+           <Route
+            path="/admin/donation"
+            element={
+              <ProtectedRoute role="admin">
+               <AdminDonations/>
+              </ProtectedRoute>
+            }
+          />
 
           {/* ===== User ROUTES ===== */}
           <Route
@@ -338,6 +347,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          
 
           <Route
   path="/admin/pending-bookings"

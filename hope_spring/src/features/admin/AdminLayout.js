@@ -24,7 +24,7 @@ const adminNavItems = [
   { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard, exact: true },
   { name: "Users", path: "/admin/users", icon: Users },
   { name: "Programs", path: "/admin/add-programs", icon: Calendar },
-  { name: "Donations", path: "/admin/donations", icon: DollarSign },
+  { name: "Donations", path: "/admin/donation", icon: DollarSign },
   { name: "Attendance", path: "/admin/attendance", icon: CheckSquare },
   { name: "Announcements", path: "/admin/announcements", icon: Megaphone },
   { name: "Event Calendar", path: "/admin/EventCalendar", icon: CalendarDays },
