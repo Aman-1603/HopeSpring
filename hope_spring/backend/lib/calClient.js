@@ -2,9 +2,11 @@
 import axios from "axios";
 
 const CAL_BASE = "https://api.cal.com/v2";
-// IMPORTANT: for confirm/decline booking endpoints we MUST use 2024-08-13
-// per Cal docs. Older versions won't have /bookings/{uid}/confirm|decline.
-const CAL_VERSION = "2024-08-13";
+
+// Default version for most endpoints.
+// Schedules + event types are fine with 2024-06-11.
+// Booking confirm/decline will override to 2024-08-13.
+const DEFAULT_CAL_VERSION = "2024-06-11";
 
 /* ============================================
    ENV + BASE CLIENT
@@ -25,7 +27,7 @@ export const cal = axios.create({
       ? CAL_API_KEY
       : `Bearer ${CAL_API_KEY}`,
     "Content-Type": "application/json",
-    "cal-api-version": CAL_VERSION,
+    "cal-api-version": DEFAULT_CAL_VERSION,
   },
   timeout: 20000,
 });
@@ -39,8 +41,20 @@ function unwrap(res) {
 }
 
 function toApiMsg(err) {
+  if (err?.response?.data) {
+    try {
+      console.error(
+        "💥 [Cal RAW ERROR DATA] ",
+        JSON.stringify(err.response.data, null, 2)
+      );
+    } catch {
+      console.error("💥 [Cal RAW ERROR DATA] (non-JSON)", err.response.data);
+    }
+  }
+
   const d = err?.response?.data;
   if (!d) return err.message || "Unknown Cal error";
+
   if (typeof d === "string") return d;
   if (d.message) {
     return typeof d.message === "string"
@@ -48,6 +62,7 @@ function toApiMsg(err) {
       : JSON.stringify(d.message);
   }
   if (d.error?.message) return d.error.message;
+
   try {
     return JSON.stringify(d);
   } catch {
@@ -68,7 +83,6 @@ async function calGet(path, config) {
 
 async function calPost(path, payload, config) {
   try {
-    // Avoid sending literal "null" as JSON body.
     const body =
       payload === null || payload === undefined ? undefined : payload;
 
@@ -96,11 +110,17 @@ async function calPatch(path, payload, config) {
    SCHEDULES
 ============================================ */
 
+/**
+ * Create a schedule for the authenticated user.
+ * Docs expect 2024-06-11 for /v2/schedules.
+ */
 export async function createSchedule(input) {
   const {
     name,
     timeZone = "America/New_York",
-    availability = [],
+    availability,
+    overrides,
+    isDefault = false,
     ...rest
   } = input || {};
 
@@ -109,11 +129,19 @@ export async function createSchedule(input) {
   const payload = {
     name,
     timeZone,
-    availability,
-    ...rest,
+    isDefault,
   };
 
-  return calPost("/schedules", payload);
+  if (availability !== undefined) payload.availability = availability;
+  if (overrides !== undefined) payload.overrides = overrides;
+
+  Object.assign(payload, rest);
+
+  return calPost("/schedules", payload, {
+    headers: {
+      "cal-api-version": "2024-06-11",
+    },
+  });
 }
 
 /**
@@ -122,40 +150,125 @@ export async function createSchedule(input) {
 export async function updateSchedule(scheduleId, input) {
   if (!scheduleId) throw new Error("updateSchedule: scheduleId is required");
   const payload = { ...(input || {}) };
-  return calPatch(`/schedules/${scheduleId}`, payload);
+  return calPatch(`/schedules/${scheduleId}`, payload, {
+    headers: {
+      "cal-api-version": "2024-06-11",
+    },
+  });
 }
 
 /* ============================================
    EVENT TYPES
 ============================================ */
 
+/**
+ * Create an event type in Cal (v2).
+ * Handles:
+ *  - length / lengthInMinutes mapping
+ *  - seats object (with showAttendeeInfo)
+ *  - legacy seat fields
+ *  - default locations
+ *  - bookingFields + requiresConfirmation
+ */
 export async function createEventType(input) {
   if (!input) throw new Error("createEventType: input is required");
 
   const {
     title,
     slug,
+    // some code might pass length directly, some uses lengthInMinutes
+    length, // optional direct field
     lengthInMinutes = 60,
     description,
     scheduleId,
     locations,
-    seats,
     bookingWindow,
+    metadata,
+
+    // booking / form behaviour
+    bookingFields,
+    requiresConfirmation,
+
+    // preferred v2 seats shape
+    seats,
+
+    // legacy fields your routes might still send
+    seatsPerTimeSlot,
+    seatsShowAttendees,
+    seatsShowAvailabilityCount,
+
     ...rest
   } = input;
 
   if (!title) throw new Error("createEventType: title is required");
   if (!scheduleId) throw new Error("createEventType: scheduleId is required");
 
+  // ---- length mapping ----
+  // Cal expects "length". We accept length or lengthInMinutes and map to length.
+  const finalLength =
+    length !== undefined && length !== null ? Number(length) : Number(lengthInMinutes);
+  if (!finalLength || Number.isNaN(finalLength) || finalLength < 1) {
+    throw new Error(
+      `createEventType: invalid length/lengthInMinutes (${length}, ${lengthInMinutes})`
+    );
+  }
+
+  // ---- Seats ----
+  let seatsPayload = seats || undefined;
+
+  const hasLegacySeatsFields =
+    seatsPerTimeSlot !== undefined ||
+    seatsShowAttendees !== undefined ||
+    seatsShowAvailabilityCount !== undefined;
+
+  if (!seatsPayload && hasLegacySeatsFields) {
+    seatsPayload = {};
+    if (seatsPerTimeSlot !== undefined) {
+      seatsPayload.seatsPerTimeSlot = seatsPerTimeSlot;
+    }
+    if (seatsShowAttendees !== undefined) {
+      seatsPayload.showAttendees = seatsShowAttendees;
+    }
+    if (seatsShowAvailabilityCount !== undefined) {
+      seatsPayload.showAvailabilityCount = seatsShowAvailabilityCount;
+    }
+  }
+
+  // Cal wants showAttendeeInfo present when seats are enabled.
+  if (seatsPayload && seatsPayload.showAttendeeInfo === undefined) {
+    seatsPayload.showAttendeeInfo = false;
+  }
+
+  // ---- Locations ----
+  const finalLocations =
+    locations && Array.isArray(locations) && locations.length > 0
+      ? locations
+      : [
+          {
+            type: "integration",
+            integration: "cal-video",
+          },
+        ];
+
+  // ---- Booking fields / confirmation ----
+  const finalBookingFields = Array.isArray(bookingFields)
+    ? bookingFields
+    : [];
+  const finalRequiresConfirmation =
+    requiresConfirmation !== undefined ? !!requiresConfirmation : false;
+
   const payload = {
     title,
     slug,
-    lengthInMinutes,
+    length: finalLength, // 👈 THIS is what Cal validates
     description,
     scheduleId,
-    locations,
-    seats,
+    locations: finalLocations,
     bookingWindow,
+    metadata: metadata || {},
+    bookingFields: finalBookingFields,
+    requiresConfirmation: finalRequiresConfirmation,
+    ...(seatsPayload ? { seats: seatsPayload } : {}),
     ...rest,
   };
 
@@ -171,12 +284,16 @@ export async function updateEventType(eventTypeId, input) {
   const {
     title,
     slug,
-    lengthInMinutes,
+    length, // Cal's field
+    lengthInMinutes, // if someone still passes this for updates
     description,
     scheduleId,
     locations,
-    seats,
     bookingWindow,
+    metadata,
+    seats,
+    bookingFields,
+    requiresConfirmation,
     ...rest
   } = input || {};
 
@@ -184,12 +301,27 @@ export async function updateEventType(eventTypeId, input) {
 
   if (title !== undefined) payload.title = title;
   if (slug !== undefined) payload.slug = slug;
-  if (lengthInMinutes !== undefined) payload.lengthInMinutes = lengthInMinutes;
+
+  if (length !== undefined || lengthInMinutes !== undefined) {
+    const finalLength =
+      length !== undefined && length !== null
+        ? Number(length)
+        : Number(lengthInMinutes);
+    if (!Number.isNaN(finalLength) && finalLength >= 1) {
+      payload.length = finalLength;
+    }
+  }
+
   if (description !== undefined) payload.description = description;
   if (scheduleId !== undefined) payload.scheduleId = scheduleId;
   if (locations !== undefined) payload.locations = locations;
-  if (seats !== undefined) payload.seats = seats;
   if (bookingWindow !== undefined) payload.bookingWindow = bookingWindow;
+  if (metadata !== undefined) payload.metadata = metadata;
+  if (seats !== undefined) payload.seats = seats;
+  if (bookingFields !== undefined) payload.bookingFields = bookingFields;
+  if (requiresConfirmation !== undefined) {
+    payload.requiresConfirmation = !!requiresConfirmation;
+  }
 
   Object.assign(payload, rest);
 
@@ -232,34 +364,31 @@ export async function createBooking({
 
 /* ============================================
    BOOKINGS — ADMIN ACTIONS (v2)
-   Used by Admin Pending tab
+   Need 2024-08-13
 ============================================ */
 
-/**
- * Confirm a booking in Cal v2.
- * POST /v2/bookings/{uid}/confirm
- */
 export async function confirmBooking(bookingUid) {
   if (!bookingUid) throw new Error("confirmBooking: bookingUid is required");
-  // No payload required, so we call without a body
-  return calPost(`/bookings/${bookingUid}/confirm`, undefined);
+
+  return calPost(`/bookings/${bookingUid}/confirm`, undefined, {
+    headers: {
+      "cal-api-version": "2024-08-13",
+    },
+  });
 }
 
-/**
- * Decline a booking in Cal v2.
- * POST /v2/bookings/{uid}/decline
- * Optional { reason }
- */
 export async function declineBooking(bookingUid, reason = null) {
   if (!bookingUid) throw new Error("declineBooking: bookingUid is required");
 
   const payload = {};
   if (reason) payload.reason = reason;
-
-  // If there's no reason, send no body at all.
   const body = Object.keys(payload).length ? payload : undefined;
 
-  return calPost(`/bookings/${bookingUid}/decline`, body);
+  return calPost(`/bookings/${bookingUid}/decline`, body, {
+    headers: {
+      "cal-api-version": "2024-08-13",
+    },
+  });
 }
 
 /* ============================================
@@ -268,7 +397,11 @@ export async function declineBooking(bookingUid, reason = null) {
 
 export async function getSchedule(scheduleId) {
   if (!scheduleId) throw new Error("getSchedule: scheduleId is required");
-  return calGet(`/schedules/${scheduleId}`);
+  return calGet(`/schedules/${scheduleId}`, {
+    headers: {
+      "cal-api-version": "2024-06-11",
+    },
+  });
 }
 
 export async function getEventType(eventTypeId) {
