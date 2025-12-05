@@ -46,6 +46,7 @@ import BoardOfDirectors from "../components/Pages/About/BDirector";
 import DonorPartners from "../components/Pages/About/Donor";
 import Reports from "../components/Pages/About/Report";
 import WigsCamisolesHeadcovers from "../components/Pages/GetFreeSupport/BookaService/WigsCamisolesHeadcovers";
+import SupportCalendar from "../components/Pages/GetFreeSupport/SupportCalendar";
 
 // Admin Section
 import AdminDashboard from "../features/admin/pages/AdminDashboard";
@@ -131,10 +132,6 @@ export default function App() {
           />
 
           {/* Get Free Support */}
-          <Route
-            path="/support/calendar"
-            element={<Page title="View Calendar & Register" />}
-          />
           <Route path="/support/programs" element={<Page title="Programs" />} />
           <Route
             path="/support/programs/support-groups"
@@ -358,6 +355,8 @@ export default function App() {
   path="/book/wigs-camisoles-headcovers"
   element={<WigsCamisolesHeadcovers />}
 />
+
+<Route path="/support/calendar" element={<SupportCalendar />} />
 
 <Route
   path="/admin/boutique-requests"

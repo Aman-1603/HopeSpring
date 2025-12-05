@@ -257,7 +257,7 @@ export default function ProgramTemplate({ config }) {
   const { user, token } = useAuth();
 
   const {
-    slug = "meditation",
+    //slug = "meditation",
     categoryName = "Gentle Exercise",
     subcategoryName = "Meditation",
 

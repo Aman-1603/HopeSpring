@@ -1,6 +1,7 @@
 // backend/routes/programRoutes.js
 import express from "express";
 import { pool } from "../db.js";
+import { getSlotsForEventType } from "../lib/calClient.js";
 
 const router = express.Router();
 
@@ -92,7 +93,7 @@ router.get("/", async (req, res) => {
         p.cal_schedule_id,
         p.duration_minutes,
         p.zoom_link,
-        p.subcategory              -- 👈 NEW
+        p.subcategory
       FROM programs p
       LEFT JOIN (
         SELECT
@@ -133,7 +134,7 @@ router.get("/support-groups", async (req, res) => {
         p.cal_schedule_id,
         p.zoom_link,
         p.duration_minutes,
-        p.subcategory,             -- 👈 NEW (not strictly needed but nice)
+        p.subcategory,
         COALESCE(b.count_accepted, 0) AS participants
       FROM programs p
       LEFT JOIN (
@@ -221,7 +222,106 @@ router.delete("/occurrence/:occId", async (req, res) => {
 });
 
 /* =========================================================
-   GET OCCURRENCES FOR A PROGRAM
+   CAL-BACKED PROGRAM CALENDAR (SLOTS)
+   GET /api/programs/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
+========================================================= */
+router.get("/calendar", async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "from and to are required (YYYY-MM-DD)",
+        });
+    }
+
+    // Fetch programs that are wired to Cal and active
+    const { rows: programs } = await pool.query(
+      `
+      SELECT
+        id,
+        title,
+        description,
+        category,
+        subcategory,
+        location,
+        instructor,
+        max_capacity,
+        cal_event_type_id,
+        cal_slug,
+        cal_user,
+        duration_minutes
+      FROM programs
+      WHERE cal_event_type_id IS NOT NULL
+        AND is_active = TRUE
+      `
+    );
+
+    // No Cal-wired programs → empty but successful
+    if (!programs.length) {
+      return res.json({ success: true, slots: [] });
+    }
+
+    const slotPromises = programs.map(async (p) => {
+      const data = await getSlotsForEventType({
+        eventTypeId: p.cal_event_type_id,
+        start: from,
+        end: to,
+        timeZone: TZ,
+      });
+
+      const slots = [];
+
+      // data = { "2026-01-23": [ { start }, ... ], ... }
+      for (const [date, daySlots] of Object.entries(data || {})) {
+        if (!Array.isArray(daySlots)) continue;
+
+        for (const s of daySlots) {
+          if (!s?.start) continue;
+
+          const startDate = new Date(s.start);
+          const duration = p.duration_minutes || 60; // fallback 60 min
+          const endDate = new Date(startDate.getTime() + duration * 60000);
+
+          slots.push({
+            programId: p.id,
+            programName: p.title,
+            description: p.description || "",
+            category: p.category || "",
+            subcategory: p.subcategory || "",
+            location: p.location || "",
+            instructor: p.instructor || "",
+            calEventTypeId: p.cal_event_type_id,
+            calSlug: p.cal_slug || null,
+            calUser: p.cal_user || null,
+            date, // "YYYY-MM-DD"
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
+            timeZone: TZ,
+            capacity: p.max_capacity ?? null,
+            participants: null, // can be filled later from bookings if you want
+          });
+        }
+      }
+
+      return slots;
+    });
+
+    const perProgram = await Promise.all(slotPromises);
+    const allSlots = perProgram.flat();
+
+    return res.json({ success: true, slots: allSlots });
+  } catch (err) {
+    console.error("❌ Error building Cal-backed program calendar:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+/* =========================================================
+   GET OCCURRENCES FOR A PROGRAM (DB)
 ========================================================= */
 router.get("/:id/occurrences", async (req, res) => {
   try {

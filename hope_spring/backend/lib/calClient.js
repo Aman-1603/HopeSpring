@@ -8,6 +8,9 @@ const CAL_BASE = "https://api.cal.com/v2";
 // Booking confirm/decline will override to 2024-08-13.
 const DEFAULT_CAL_VERSION = "2024-06-11";
 
+// Dedicated version for /v2/slots
+const SLOTS_CAL_VERSION = "2024-09-04";
+
 /* ============================================
    ENV + BASE CLIENT
 ============================================ */
@@ -44,11 +47,11 @@ function toApiMsg(err) {
   if (err?.response?.data) {
     try {
       console.error(
-        "💥 [Cal RAW ERROR DATA] ",
+        "[Cal RAW ERROR DATA] ",
         JSON.stringify(err.response.data, null, 2)
       );
     } catch {
-      console.error("💥 [Cal RAW ERROR DATA] (non-JSON)", err.response.data);
+      console.error("[Cal RAW ERROR DATA] (non-JSON)", err.response.data);
     }
   }
 
@@ -76,7 +79,7 @@ async function calGet(path, config) {
     return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
-    console.error("❌ Cal GET failed:", path, msg);
+    console.error("Cal GET failed:", path, msg);
     throw new Error(msg);
   }
 }
@@ -90,7 +93,7 @@ async function calPost(path, payload, config) {
     return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
-    console.error("❌ Cal POST failed:", path, msg, payload);
+    console.error("Cal POST failed:", path, msg, payload);
     throw new Error(msg);
   }
 }
@@ -101,7 +104,7 @@ async function calPatch(path, payload, config) {
     return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
-    console.error("❌ Cal PATCH failed:", path, msg, payload);
+    console.error("Cal PATCH failed:", path, msg, payload);
     throw new Error(msg);
   }
 }
@@ -260,7 +263,7 @@ export async function createEventType(input) {
   const payload = {
     title,
     slug,
-    length: finalLength, // 👈 THIS is what Cal validates
+    length: finalLength, 
     description,
     scheduleId,
     locations: finalLocations,
@@ -388,6 +391,62 @@ export async function declineBooking(bookingUid, reason = null) {
     headers: {
       "cal-api-version": "2024-08-13",
     },
+  });
+}
+
+/* ============================================
+   SLOTS / AVAILABILITY (v2 /slots)
+============================================ */
+
+/**
+ * Fetch available slots for an event type from Cal.
+ * Uses /v2/slots with API version 2024-09-04.
+ *
+ * Returns the inner `data` object from Cal, e.g.:
+ * {
+ *   "2026-01-23": [ { start: "2026-01-23T09:00:00.000-05:00" } ],
+ *   "2026-01-24": [ { start: "2026-01-24T09:00:00.000-05:00" } ]
+ * }
+ */
+export async function getSlotsForEventType({
+  eventTypeId,
+  start,
+  end,
+  timeZone = "America/Toronto",
+  eventTypeSlug,
+  username,
+  teamSlug,
+  organizationSlug,
+}) {
+  // Support either eventTypeId OR slug+username/team/org
+  const hasId = !!eventTypeId;
+  const hasSlug =
+    !!eventTypeSlug &&
+    (username || teamSlug || organizationSlug);
+
+  if (!hasId && !hasSlug) {
+    throw new Error(
+      "getSlotsForEventType: provide eventTypeId or (eventTypeSlug + username/teamSlug/organizationSlug)"
+    );
+  }
+
+  const params = {
+    start,
+    end,
+    timeZone,
+  };
+
+  if (eventTypeId) params.eventTypeId = eventTypeId;
+  if (eventTypeSlug) params.eventTypeSlug = eventTypeSlug;
+  if (username) params.username = username;
+  if (teamSlug) params.teamSlug = teamSlug;
+  if (organizationSlug) params.organizationSlug = organizationSlug;
+
+  return calGet("/slots", {
+    headers: {
+      "cal-api-version": SLOTS_CAL_VERSION,
+    },
+    params,
   });
 }
 

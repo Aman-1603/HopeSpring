@@ -192,7 +192,7 @@ export default function ProgramManagement() {
     const normalizedCategoryValue = normalizeCategory(formData.category);
     const isSupportGroup = normalizedCategoryValue === "support_group";
     const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
-    const isCounselling = normalizedCategoryValue === "counselling";
+   // const isCounselling = normalizedCategoryValue === "counselling";
 
     // any category that should automatically be wired to Cal
     // NOTE: counselling uses Cal as a request system, but we don't

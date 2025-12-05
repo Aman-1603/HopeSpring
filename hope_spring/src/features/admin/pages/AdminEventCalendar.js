@@ -1,11 +1,11 @@
 // src/AdminSection/EventCalendar/AdminEventCalendar.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import axios from "axios";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
+import enUS from "date-fns/locale/en-US";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import {
-  Plus,
   X,
   CalendarDays,
   Clock,
@@ -16,7 +16,7 @@ import AdminLayout from "../AdminLayout";
 
 // ---------- date-fns localizer ----------
 const locales = {
-  "en-US": require("date-fns/locale/en-US"),
+  "en-US": enUS,
 };
 
 const localizer = dateFnsLocalizer({
@@ -27,8 +27,8 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-// API route (programs + occurrences)
-const API_BASE = "/api/calendar-events";
+// 🔗 Cal-backed calendar endpoint
+const API_BASE = "/api/programs/calendar";
 
 // ---------- category → color map (HopeSpring style) ----------
 const CATEGORY_COLORS = {
@@ -217,41 +217,80 @@ const AdminEventCalendar = () => {
   const [events, setEvents] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(null);
 
-  // ---------- load data from backend ----------
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const res = await axios.get(API_BASE);
+  // controlled calendar view + date (for month/week/day switching)
+  const [view, setView] = useState("month");
+  const [date, setDate] = useState(new Date());
+  const [loading, setLoading] = useState(false);
 
-        const mapped = res.data.map((e) => ({
-          id: e.occurrence_id,
-          program_id: e.program_id,
-          title: e.title,
-          description: e.description,
-          category: e.category,
-          instructor: e.instructor,
-          location: e.location,
-          start: new Date(e.starts_at),
-          end: new Date(e.ends_at || e.starts_at),
-        }));
+  // ---------- fetch events for visible range (Cal slots) ----------
+  const fetchEventsForRange = useCallback(async (range) => {
+    if (!range) return;
 
-        setEvents(mapped);
-      } catch (err) {
-        console.error("❌ Error loading calendar events:", err);
+    let startDate, endDate;
+
+    // react-big-calendar gives:
+    // - array of Dates for month/week
+    // - { start, end } object for day
+    if (Array.isArray(range) && range.length > 0) {
+      startDate = range[0];
+      endDate = range[range.length - 1];
+    } else if (range.start && range.end) {
+      startDate = range.start;
+      endDate = range.end;
+    } else {
+      return;
+    }
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const toYMD = (d) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    const from = toYMD(startDate);
+    const to = toYMD(endDate);
+
+    try {
+      setLoading(true);
+      const res = await axios.get(API_BASE, { params: { from, to } });
+
+      if (!res.data?.success) {
+        setEvents([]);
+        return;
       }
-    };
 
-    loadEvents();
+      const slots = res.data.slots || [];
+
+      // Map backend slots → calendar events
+      const mapped = slots.map((s) => {
+        const start = new Date(s.start);
+        const end = new Date(s.end);
+
+        return {
+          id: `${s.programId}-${s.start}`,
+          program_id: s.programId,
+          title: s.programName,
+          description: s.description || "",
+          category: s.category || "",
+          instructor: s.instructor || "",
+          location: s.location || "",
+          start,
+          end,
+        };
+      });
+
+      setEvents(mapped);
+    } catch (err) {
+      console.error("❌ Error loading calendar slots:", err);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // ---------- color styling ----------
-  const eventStyleGetter = (event) => {
-    const categoryKey = (event.category || "").toLowerCase();
-    const color =
-      CATEGORY_COLORS[categoryKey] ||
-      CATEGORY_COLORS[categoryKey.replace(/\s+/g, " ")] ||
-      DEFAULT_COLOR;
+  // react-big-calendar will call onRangeChange on initial render,
+  // so no need for a separate useEffect to trigger load.
 
+  // ---------- color styling ----------
+  const eventStyleGetter = () => {
     return {
       style: {
         backgroundColor: "transparent", // we style inside CustomEvent
@@ -266,20 +305,6 @@ const AdminEventCalendar = () => {
   // ---------- select event → open detail modal ----------
   const handleSelectEvent = (event) => {
     setShowDetailModal(event);
-  };
-
-  // ---------- delete one occurrence ----------
-  const handleDelete = async (occId) => {
-    if (!window.confirm("Delete this session from the calendar?")) return;
-
-    try {
-      await axios.delete(`/api/programs/occurrence/${occId}`);
-      setEvents((prev) => prev.filter((e) => e.id !== occId));
-      setShowDetailModal(null);
-    } catch (err) {
-      console.error("❌ Error deleting occurrence:", err);
-      alert("Failed to delete session");
-    }
   };
 
   // ---------- legend for categories ----------
@@ -302,7 +327,7 @@ const AdminEventCalendar = () => {
             </h1>
             <p className="text-sm text-slate-500">
               All scheduled program sessions (support groups, gentle exercise,
-              art, and more) in one view.
+              art, and more) directly from Cal.
             </p>
           </div>
 
@@ -336,27 +361,32 @@ const AdminEventCalendar = () => {
 
         {/* calendar */}
         <div className="bg-white rounded-3xl shadow-xl border border-[#e2e8f0] px-4 sm:px-6 py-4">
+          {loading && (
+            <div className="text-xs text-slate-400 mb-2">
+              Loading sessions for this view…
+            </div>
+          )}
+
           <Calendar
-  localizer={localizer}
-  events={events}
-  startAccessor="start"
-  endAccessor="end"
-  style={{ height: 620 }}
-
-  views={["month", "week", "day"]}
-  defaultView="month"
-  onNavigate={() => {}}     // 🔥 REQUIRED
-  onView={() => {}}         // 🔥 REQUIRED
-
-  components={{
-    toolbar: CustomToolbar,
-    event: CustomEvent,
-  }}
-  eventPropGetter={eventStyleGetter}
-  popup
-  onSelectEvent={handleSelectEvent}
-/>
-
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: 620 }}
+            views={["month", "week", "day"]}
+            view={view}
+            onView={(v) => setView(v)}      // month / week / day switching
+            date={date}
+            onNavigate={(d) => setDate(d)}  // prev / next / today
+            onRangeChange={fetchEventsForRange} // 🔑 drives backend from/to
+            components={{
+              toolbar: CustomToolbar,
+              event: CustomEvent,
+            }}
+            eventPropGetter={eventStyleGetter}
+            popup
+            onSelectEvent={handleSelectEvent}
+          />
         </div>
 
         {/* detail modal */}
@@ -422,17 +452,12 @@ const AdminEventCalendar = () => {
 
               <div className="flex justify-end gap-3 mt-4">
                 <button
-   usne               onClick={() => setShowDetailModal(null)}
+                  onClick={() => setShowDetailModal(null)}
                   className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm text-slate-700"
                 >
                   Close
                 </button>
-                <button
-                  onClick={() => handleDelete(showDetailModal.id)}
-                  className="px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm hover:bg-red-100 border border-red-100"
-                >
-                  Delete Session
-                </button>
+                {/* Read-only: no delete button here since slots come from Cal */}
               </div>
             </div>
           </div>
