@@ -192,9 +192,13 @@ export default function ProgramManagement() {
     const normalizedCategoryValue = normalizeCategory(formData.category);
     const isSupportGroup = normalizedCategoryValue === "support_group";
     const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
+    const isCounselling = normalizedCategoryValue === "counselling";
 
     // any category that should automatically be wired to Cal
-    const wantsCalIntegration = isSupportGroup || isGentleExercise;
+    // NOTE: counselling uses Cal as a request system, but we don't
+    // auto-create/update its event type on save to avoid surprises.
+    const wantsCalIntegration =
+      isSupportGroup || isGentleExercise; // NOT counselling
 
     const storedCategory = isSupportGroup
       ? "support_group"
@@ -344,6 +348,7 @@ export default function ProgramManagement() {
   const normalizedCategoryValue = normalizeCategory(formData.category);
   const isSupportGroup = normalizedCategoryValue === "support_group";
   const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
+  // const isCounselling = normalizedCategoryValue === "counselling"; // ready if we want conditional UI later
 
   return (
     <AdminLayout>
@@ -874,9 +879,7 @@ function StatCard({ label, value, icon }) {
     <div className="bg-white/80 border rounded-2xl p-4 shadow-sm flex items-center justify-between">
       <div>
         <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-2xl font-semibold text-gray-8
-
-00 mt-1">{value}</p>
+        <p className="text-2xl font-semibold text-gray-800 mt-1">{value}</p>
       </div>
       {icon}
     </div>

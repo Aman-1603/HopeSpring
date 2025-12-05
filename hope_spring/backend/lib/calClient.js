@@ -2,7 +2,9 @@
 import axios from "axios";
 
 const CAL_BASE = "https://api.cal.com/v2";
-const CAL_VERSION = "2024-06-14";
+// IMPORTANT: for confirm/decline booking endpoints we MUST use 2024-08-13
+// per Cal docs. Older versions won't have /bookings/{uid}/confirm|decline.
+const CAL_VERSION = "2024-08-13";
 
 /* ============================================
    ENV + BASE CLIENT
@@ -66,7 +68,11 @@ async function calGet(path, config) {
 
 async function calPost(path, payload, config) {
   try {
-    const res = await cal.post(path, payload, config);
+    // Avoid sending literal "null" as JSON body.
+    const body =
+      payload === null || payload === undefined ? undefined : payload;
+
+    const res = await cal.post(path, body, config);
     return unwrap(res);
   } catch (err) {
     const msg = toApiMsg(err);
@@ -89,7 +95,6 @@ async function calPatch(path, payload, config) {
 /* ============================================
    SCHEDULES
 ============================================ */
-
 
 export async function createSchedule(input) {
   const {
@@ -123,7 +128,6 @@ export async function updateSchedule(scheduleId, input) {
 /* ============================================
    EVENT TYPES
 ============================================ */
-
 
 export async function createEventType(input) {
   if (!input) throw new Error("createEventType: input is required");
@@ -193,9 +197,8 @@ export async function updateEventType(eventTypeId, input) {
 }
 
 /* ============================================
-   BOOKINGS
+   BOOKINGS (normal create)
 ============================================ */
-
 
 export async function createBooking({
   eventTypeId,
@@ -225,6 +228,38 @@ export async function createBooking({
   };
 
   return calPost("/bookings", payload);
+}
+
+/* ============================================
+   BOOKINGS — ADMIN ACTIONS (v2)
+   Used by Admin Pending tab
+============================================ */
+
+/**
+ * Confirm a booking in Cal v2.
+ * POST /v2/bookings/{uid}/confirm
+ */
+export async function confirmBooking(bookingUid) {
+  if (!bookingUid) throw new Error("confirmBooking: bookingUid is required");
+  // No payload required, so we call without a body
+  return calPost(`/bookings/${bookingUid}/confirm`, undefined);
+}
+
+/**
+ * Decline a booking in Cal v2.
+ * POST /v2/bookings/{uid}/decline
+ * Optional { reason }
+ */
+export async function declineBooking(bookingUid, reason = null) {
+  if (!bookingUid) throw new Error("declineBooking: bookingUid is required");
+
+  const payload = {};
+  if (reason) payload.reason = reason;
+
+  // If there's no reason, send no body at all.
+  const body = Object.keys(payload).length ? payload : undefined;
+
+  return calPost(`/bookings/${bookingUid}/decline`, body);
 }
 
 /* ============================================

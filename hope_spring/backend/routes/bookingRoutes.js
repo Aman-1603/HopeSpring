@@ -1,6 +1,7 @@
 // backend/routes/bookingRoutes.js
 import express from "express";
 import { pool } from "../db.js";
+import { confirmBooking, declineBooking } from "../lib/calClient.js";
 
 const router = express.Router();
 
@@ -81,10 +82,48 @@ router.get("/", async (req, res) => {
 });
 
 /* ============================================================
+   GET /api/bookings/pending
+   Admin: list ONLY pending / requested bookings
+============================================================ */
+router.get("/pending", async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin only" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        b.*,
+        p.title    AS program_title,
+        p.category AS program_category
+      FROM bookings b
+      LEFT JOIN programs p ON p.id = b.program_id
+      WHERE LOWER(b.status) IN ('pending','requested')
+      ORDER BY b.created_at ASC
+      `
+    );
+
+    return res.json({ success: true, bookings: result.rows });
+  } catch (err) {
+    console.error("❌ Fetch pending bookings failed:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error" });
+  }
+});
+
+/* ============================================================
    GET /api/bookings/user/:userId
    Member: their bookings
    - normal user: can ONLY view their own bookings
    - admin: can view any userId
+
+   NOTE:
+   Auth is enforced at router mount level in server.js
+   (e.g. app.use("/api/bookings", requireAuth, bookingRoutes))
 ============================================================ */
 router.get("/user/:userId", async (req, res) => {
   try {
@@ -126,6 +165,152 @@ router.get("/user/:userId", async (req, res) => {
   } catch (err) {
     console.error("❌ Fetch user bookings failed:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+/* ============================================================
+   POST /api/bookings/:id/approve
+   Admin: approve a pending booking.
+   - Looks up booking by local id
+   - Calls Cal v2 /bookings/{uid}/confirm
+   - Marks status = 'ACCEPTED' (webhook will also update)
+============================================================ */
+router.post("/:id/approve", async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin only" });
+    }
+
+    const id = Number(req.params.id);
+    if (!id || !Number.isFinite(id)) {
+      return res.status(400).json({ success: false, message: "Invalid id" });
+    }
+
+    const bRes = await pool.query(
+      `SELECT * FROM bookings WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (bRes.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const booking = bRes.rows[0];
+    const status = (booking.status || "").toLowerCase();
+
+    if (!["pending", "requested"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Booking is not pending (current status: ${booking.status})`,
+      });
+    }
+
+    if (!booking.cal_booking_id) {
+      return res.status(400).json({
+        success: false,
+        message: "This booking has no Cal uid; cannot confirm via API",
+      });
+    }
+
+    // 1) Confirm in Cal (v2 POST /bookings/{uid}/confirm)
+    await confirmBooking(booking.cal_booking_id);
+
+    // 2) Update local status immediately; webhook BOOKING_CREATED will also update
+    await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'ACCEPTED'
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    return res.json({ success: true, message: "Booking approved" });
+  } catch (err) {
+    console.error("❌ Approve booking failed:", err);
+    const msg =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err.message ||
+      "Failed to approve booking";
+    return res.status(500).json({ success: false, message: msg });
+  }
+});
+
+/* ============================================================
+   POST /api/bookings/:id/reject
+   Admin: reject a pending booking.
+   - Looks up booking by local id
+   - Calls Cal v2 /bookings/{uid}/decline
+   - Marks status = 'REJECTED'
+============================================================ */
+router.post("/:id/reject", async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin only" });
+    }
+
+    const id = Number(req.params.id);
+    if (!id || !Number.isFinite(id)) {
+      return res.status(400).json({ success: false, message: "Invalid id" });
+    }
+
+    const { reason } = req.body || {};
+
+    const bRes = await pool.query(
+      `SELECT * FROM bookings WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (bRes.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const booking = bRes.rows[0];
+    const status = (booking.status || "").toLowerCase();
+
+    if (!["pending", "requested"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Booking is not pending (current status: ${booking.status})`,
+      });
+    }
+
+    if (!booking.cal_booking_id) {
+      return res.status(400).json({
+        success: false,
+        message: "This booking has no Cal uid; cannot decline via API",
+      });
+    }
+
+    // 1) Decline in Cal (v2 POST /bookings/{uid}/decline)
+    await declineBooking(booking.cal_booking_id, reason || null);
+
+    // 2) Update local status; webhook BOOKING_REJECTED will also update
+    await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'REJECTED'
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    return res.json({ success: true, message: "Booking rejected" });
+  } catch (err) {
+    console.error("❌ Reject booking failed:", err);
+    const msg =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err.message ||
+      "Failed to reject booking";
+    return res.status(500).json({ success: false, message: msg });
   }
 });
 

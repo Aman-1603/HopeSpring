@@ -33,12 +33,18 @@ router.post("/", async (req, res) => {
 
     if (!trigger || !payload) {
       console.warn("[Cal webhook] Missing trigger or payload:", json);
-      return res.status(200).json({ ok: true, skipped: "no trigger/payload" });
+      return res
+        .status(200)
+        .json({ ok: true, skipped: "no trigger/payload" });
     }
 
     console.log("[Cal webhook] trigger:", trigger);
 
     switch (trigger) {
+      case "BOOKING_REQUESTED":
+        await handleBookingRequested(payload);
+        break;
+
       case "BOOKING_CREATED":
         await handleBookingCreated(payload);
         break;
@@ -128,7 +134,10 @@ async function resolveUserIdFromBooking(norm) {
         }
       }
     } catch (e) {
-      console.warn("[Cal webhook] Failed to use metadata userId:", norm.user_id);
+      console.warn(
+        "[Cal webhook] Failed to use metadata userId:",
+        norm.user_id
+      );
     }
   }
 
@@ -150,9 +159,108 @@ async function resolveUserIdFromBooking(norm) {
 }
 
 /* ============================================================
+   BOOKING_REQUESTED  (manual approval mode)
+   - Fires immediately when user submits a request
+   - We store row with status = 'PENDING'
+   - Later BOOKING_CREATED / CANCELLED / REJECTED will update it
+============================================================ */
+async function handleBookingRequested(payload) {
+  const norm = normalizeCalBooking(payload);
+  const uid = norm?.cal_booking_id;
+
+  if (!uid) {
+    console.warn("[Cal webhook] BOOKING_REQUESTED without uid:", payload);
+    return;
+  }
+
+  const programId = await findProgramForWebhook(payload);
+  if (!programId) {
+    console.warn(
+      "[Cal webhook] BOOKING_REQUESTED: program not found, skipping:",
+      uid
+    );
+    return;
+  }
+
+  const attendeeName = norm.attendee_name || "Participant";
+  const attendeeEmail = (norm.attendee_email || "").trim().toLowerCase();
+
+  if (!attendeeEmail) {
+    console.warn(
+      "[Cal webhook] BOOKING_REQUESTED without attendee_email for uid:",
+      uid
+    );
+    return;
+  }
+
+  const start = norm.event_start || null;
+  const end = norm.event_end || null;
+  const seatCount = 1;
+
+  const userId = await resolveUserIdFromBooking({
+    ...norm,
+    attendee_email: attendeeEmail,
+  });
+
+  await pool.query(
+    `
+    INSERT INTO bookings (
+      program_id,
+      user_id,
+      cal_booking_id,
+      event_start,
+      event_end,
+      attendee_name,
+      attendee_email,
+      seat_count,
+      status,
+      raw,
+      created_at
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',$9,NOW())
+    ON CONFLICT (cal_booking_id, attendee_email)
+    DO UPDATE SET
+      program_id     = EXCLUDED.program_id,
+      user_id        = EXCLUDED.user_id,
+      event_start    = EXCLUDED.event_start,
+      event_end      = EXCLUDED.event_end,
+      attendee_name  = EXCLUDED.attendee_name,
+      attendee_email = EXCLUDED.attendee_email,
+      seat_count     = EXCLUDED.seat_count,
+      status         = 'PENDING',
+      raw            = EXCLUDED.raw
+    `,
+    [
+      programId,
+      userId,
+      uid,
+      start,
+      end,
+      attendeeName,
+      attendeeEmail,
+      seatCount,
+      norm.raw || payload,
+    ]
+  );
+
+  console.log(
+    "[Cal webhook] BOOKING_REQUESTED synced (uid/email):",
+    uid,
+    attendeeEmail,
+    "→ program",
+    programId,
+    "user_id=",
+    userId,
+    "seatCount=",
+    seatCount
+  );
+}
+
+/* ============================================================
    BOOKING_CREATED
    - Use (cal_booking_id, attendee_email) as composite identity
    - One row == one participant
+   - Upgrades status to 'ACCEPTED'
 ============================================================ */
 async function handleBookingCreated(payload) {
   const norm = normalizeCalBooking(payload);
@@ -185,11 +293,8 @@ async function handleBookingCreated(payload) {
 
   const start = norm.event_start || null;
   const end = norm.event_end || null;
-
-  // One row == one participant per Cal workaround
   const seatCount = 1;
 
-  // Resolve users.user_id (may be null if no match)
   const userId = await resolveUserIdFromBooking({
     ...norm,
     attendee_email: attendeeEmail,
@@ -303,7 +408,7 @@ async function handleBookingCancelled(payload) {
 
 /* ============================================================
    BOOKING_REJECTED
-   - Same logic as CANCELLED
+   - Same logic as CANCELLED but status = REJECTED
 ============================================================ */
 async function handleBookingRejected(payload) {
   const norm = normalizeCalBooking(payload);
