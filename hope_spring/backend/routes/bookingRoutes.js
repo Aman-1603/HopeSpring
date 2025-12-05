@@ -1,45 +1,71 @@
 // backend/routes/bookingRoutes.js
-
 import express from "express";
 import { pool } from "../db.js";
 
 const router = express.Router();
 
+/* ------------------------------------------
+   Normalizer for Cal booking payloads
 
+   IMPORTANT: Our model is now:
+     - 1 DB row in `bookings` = 1 participant = 1 seat
+   So seat_count is always 1 for new rows. We keep the field
+   only for legacy compatibility / analytics if needed.
+-------------------------------------------*/
 export function normalizeCalBooking(calPayload) {
   if (!calPayload) return null;
 
   const {
     uid,
+    id,
+    bookingId,
     startTime,
     endTime,
+    start,
+    end,
     attendees = [],
     metadata = {},
+    status,
   } = calPayload;
 
   const first = attendees[0] || {};
+
+  // With the composite (cal_booking_id, attendee_email) model,
+  // each row is one person. seat_count is therefore always 1.
+  const seat_count = 1;
+
   return {
-    cal_booking_id: uid || null,
-    event_start: startTime || null,
-    event_end: endTime || null,
+    cal_booking_id: uid || id || bookingId || null,
+    event_start: startTime || start || null,
+    event_end: endTime || end || null,
     attendee_name: first.name || null,
     attendee_email: first.email || null,
-    user_id: metadata.userId || null,
+    user_id: metadata.userId || metadata.memberId || null,
+    seat_count,
+    status: status || "ACCEPTED",
     raw: calPayload,
   };
 }
 
 /* ============================================================
    GET /api/bookings
-   Admin view — all bookings
+   Admin: list ALL bookings
+   (server.js already enforces requireAuth, here we enforce role)
 ============================================================ */
 router.get("/", async (req, res) => {
   try {
+    // req.user is set by requireAuth in server.js
+    if (!req.user || req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin only" });
+    }
+
     const result = await pool.query(
       `
       SELECT
         b.*,
-        p.title AS program_title,
+        p.title    AS program_title,
         p.category AS program_category
       FROM bookings b
       LEFT JOIN programs p ON p.id = b.program_id
@@ -56,27 +82,44 @@ router.get("/", async (req, res) => {
 
 /* ============================================================
    GET /api/bookings/user/:userId
-   User dashboard — their bookings
+   Member: their bookings
+   - normal user: can ONLY view their own bookings
+   - admin: can view any userId
 ============================================================ */
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", auth, async (req, res) => {
   try {
-    const uid = Number(req.params.userId);
-    if (!uid || !Number.isFinite(uid)) {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required" });
+    }
+
+    const requestedId = Number(req.params.userId);
+    if (!requestedId || !Number.isFinite(requestedId)) {
       return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isSelf = requestedId === req.user.id;
+
+    if (!isAdmin && !isSelf) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Forbidden" });
     }
 
     const result = await pool.query(
       `
       SELECT
         b.*,
-        p.title AS program_title,
+        p.title    AS program_title,
         p.category AS program_category
       FROM bookings b
       LEFT JOIN programs p ON p.id = b.program_id
       WHERE b.user_id = $1
       ORDER BY b.event_start DESC NULLS LAST, b.created_at DESC
       `,
-      [uid]
+      [requestedId]
     );
 
     res.json({ success: true, bookings: result.rows });
@@ -88,7 +131,7 @@ router.get("/user/:userId", async (req, res) => {
 
 /* ============================================================
    POST /api/bookings/programs/:id/sync
-   Maintains bookings list integrity (cleanup logic)
+   (placeholder)
 ============================================================ */
 router.post("/programs/:id/sync", async (req, res) => {
   try {
@@ -97,30 +140,11 @@ router.post("/programs/:id/sync", async (req, res) => {
       return res.status(400).json({ error: "Invalid program id" });
     }
 
-    const { rows: existing } = await pool.query(
-      `
-      SELECT id, cal_booking_id
-      FROM bookings
-      WHERE program_id = $1
-      `,
-      [pid]
-    );
-
-    const removed = [];
-    for (const b of existing) {
-      if (!b.cal_booking_id) continue;
-
-      const inCalStillExists = true; // Stub — keep existing logic
-      if (!inCalStillExists) {
-        removed.push(b.id);
-        await pool.query(`DELETE FROM bookings WHERE id = $1`, [b.id]);
-      }
-    }
-
+    // right now we don't actually delete anything – placeholder
     return res.json({
       ok: true,
-      removed,
-      message: "Sync completed",
+      removed: [],
+      message: "Sync completed (no-op placeholder)",
     });
   } catch (err) {
     console.error("❌ Program sync failed:", err);
@@ -130,12 +154,15 @@ router.post("/programs/:id/sync", async (req, res) => {
 
 /* ============================================================
    GET /api/bookings/programs/:id/summary
-   For Admin Waitlist page
+   Used by:
+     - ProgramTemplate (to show Join waitlist)
+     - AdminWaitlist dashboard
+
    Returns:
-     capacity
-     bookedCount (future ACCEPTED/CONFIRMED/BOOKED)
-     freeSeats
-     waitlistWaiting
+     capacity         (from programs.max_capacity)
+     bookedCount      (# of rows = # participants for future active bookings)
+     freeSeats        (capacity - bookedCount)
+     waitlistWaiting  (# of waitlist rows with status='waiting')
 ============================================================ */
 router.get("/programs/:id/summary", async (req, res) => {
   try {
@@ -164,7 +191,7 @@ router.get("/programs/:id/summary", async (req, res) => {
     const prog = progRes.rows[0];
     const nowIso = new Date().toISOString();
 
-    // Count future active bookings
+    // New model: 1 booking row = 1 participant = 1 seat
     const bookRes = await pool.query(
       `
       SELECT COUNT(*) AS cnt
@@ -178,7 +205,7 @@ router.get("/programs/:id/summary", async (req, res) => {
 
     const bookedCount = Number(bookRes.rows[0]?.cnt || 0);
 
-    // Count waiting waitlist entries
+    // Waitlist count
     const wlRes = await pool.query(
       `
       SELECT COUNT(*) AS cnt
@@ -209,6 +236,88 @@ router.get("/programs/:id/summary", async (req, res) => {
   } catch (err) {
     console.error("❌ Error loading summary:", err);
     res.status(500).json({ error: "Failed to load summary" });
+  }
+});
+
+/* ============================================================
+   GET /api/bookings/programs/:id/slot-usage
+   Slot-level seat usage for a program.
+
+   Returns:
+     {
+       programId,
+       capacityPerSlot,       // from programs.max_capacity (can be null)
+       slots: [
+         {
+           eventStart: ISO string,
+           bookedCount: number
+         },
+         ...
+       ]
+     }
+
+   Notes:
+     - Only counts future (or undated) bookings with active status
+     - If a slot has no bookings yet, it won't appear here
+       → frontend treats missing = 0 booked
+============================================================ */
+router.get("/programs/:id/slot-usage", async (req, res) => {
+  try {
+    const programId = Number(req.params.id);
+    if (!programId || !Number.isFinite(programId)) {
+      return res.status(400).json({ error: "Invalid program id" });
+    }
+
+    // 1) Load program to get capacity per slot
+    const progRes = await pool.query(
+      `
+      SELECT id, max_capacity
+      FROM programs
+      WHERE id = $1
+      `,
+      [programId]
+    );
+
+    if (progRes.rows.length === 0) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const prog = progRes.rows[0];
+    const capacityPerSlot =
+      prog.max_capacity != null ? Number(prog.max_capacity) : null;
+
+    const nowIso = new Date().toISOString();
+
+    // 2) Aggregate bookings by event_start
+    const rowsRes = await pool.query(
+      `
+      SELECT
+        event_start,
+        COUNT(*) AS booked_cnt
+      FROM bookings
+      WHERE program_id = $1
+        AND event_start IS NOT NULL
+        AND (event_start >= $2)
+        AND LOWER(status) IN ('accepted','confirmed','booked')
+      GROUP BY event_start
+      ORDER BY event_start
+      `,
+      [programId, nowIso]
+    );
+
+    const slots = (rowsRes.rows || []).map((row) => ({
+      eventStart: row.event_start, // timestamptz → ISO when JSON stringified
+      bookedCount: Number(row.booked_cnt || 0),
+    }));
+
+    return res.json({
+      programId,
+      capacityPerSlot,
+      slots,
+    });
+  } catch (err) {
+    console.error("❌ Error loading slot usage:", err);
+    return res.status(500).json({ error: "Failed to load slot usage" });
   }
 });
 

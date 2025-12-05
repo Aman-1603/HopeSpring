@@ -26,6 +26,10 @@ const WAITLIST_STATUS = {
 /* ------------------------------------------
    POST /api/waitlist/join
    Body: { programId, memberId?, name?, email? }
+
+   New rule:
+   - If there is already an ACTIVE/FUTURE booking for this program
+     with the same email, we DO NOT add to waitlist.
 -------------------------------------------*/
 router.post("/join", async (req, res) => {
   try {
@@ -59,7 +63,35 @@ router.post("/join", async (req, res) => {
 
     const trimmedEmail = normalizeEmail(email);
 
-    // 2) Avoid duplicate "waiting" entries
+    // 2) HARD RULE: if this email already has a future active booking
+    //    for this program → reject waitlist.
+    if (trimmedEmail) {
+      const nowIso = new Date().toISOString();
+
+      const existingBookingRes = await pool.query(
+        `
+        SELECT id
+        FROM bookings
+        WHERE program_id = $1
+          AND attendee_email IS NOT NULL
+          AND LOWER(attendee_email) = $2
+          AND LOWER(status) IN ('accepted','confirmed','booked')
+          AND (event_start IS NULL OR event_start >= $3)
+        LIMIT 1
+        `,
+        [pid, trimmedEmail, nowIso]
+      );
+
+      if (existingBookingRes.rows.length > 0) {
+        return res.status(200).json({
+          ok: true,
+          alreadyBooked: true,
+          message: "This email already has a booking for this program.",
+        });
+      }
+    }
+
+    // 3) Avoid duplicate "waiting" entries on the waitlist itself
     const existingRes = await pool.query(
       `
       SELECT id, program_id, member_id, attendee_name, attendee_email, status, created_at
@@ -85,7 +117,7 @@ router.post("/join", async (req, res) => {
       });
     }
 
-    // 3) Insert new waitlist row
+    // 4) Insert new waitlist row
     const insertRes = await pool.query(
       `
       INSERT INTO waitlist (
@@ -206,7 +238,9 @@ router.post("/:id/cancel", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error cancelling waitlist entry:", err);
-    return res.status(500).json({ error: "Failed to cancel waitlist entry" });
+    return res
+      .status(500)
+      .json({ error: "Failed to cancel waitlist entry" });
   }
 });
 
@@ -366,10 +400,22 @@ router.post("/:id/promote", async (req, res) => {
     const attendeeFromCal =
       (Array.isArray(calData.attendees) && calData.attendees[0]) || null;
 
-    const attendeeEmail =
+    let attendeeEmail =
       attendeeFromCal?.email || entry.attendee_email || null;
+    attendeeEmail = normalizeEmail(attendeeEmail);
+
     const attendeeName =
       attendeeFromCal?.name || entry.attendee_name || null;
+
+    if (!attendeeEmail) {
+      console.error(
+        "❌ promote: missing attendeeEmail after Cal response + entry fallback",
+        { calDataAttendee: attendeeFromCal, entry }
+      );
+      return res
+        .status(500)
+        .json({ error: "Internal error: missing attendee email for booking" });
+    }
 
     const status = calData.status || "ACCEPTED";
     const userId = entry.member_id || null;
@@ -381,7 +427,7 @@ router.post("/:id/promote", async (req, res) => {
       apiPayload: payload,
     };
 
-    // 5) Upsert into bookings table (same pattern as webhook)
+    // 5) Upsert into bookings table (same composite key pattern as webhook)
     const insertRes = await pool.query(
       `
       INSERT INTO bookings (
@@ -400,7 +446,7 @@ router.post("/:id/promote", async (req, res) => {
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
       )
-      ON CONFLICT (cal_booking_id)
+      ON CONFLICT (cal_booking_id, attendee_email)
       DO UPDATE SET
         program_id        = EXCLUDED.program_id,
         user_id           = EXCLUDED.user_id,

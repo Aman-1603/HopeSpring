@@ -5,6 +5,17 @@ const MyPrograms = ({ programs }) => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
+  if (!programs || programs.length === 0) {
+    return (
+      <section className="space-y-6">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          My Programs
+        </h2>
+        <p className="text-gray-600">You have no programs scheduled.</p>
+      </section>
+    );
+  }
+
   const handleViewDetails = (program) => {
     setSelectedProgram(program);
     setIsDetailsOpen(true);

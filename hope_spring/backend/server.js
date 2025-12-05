@@ -14,11 +14,10 @@ import calendarEventRoutes from "../backend/routes/calendarEvents.js";
 import donateRoutes from "../backend/routes/donateRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import calWebhookRoutes from "./routes/calWebhookRoutes.js";
-import supportRoutes from "./routes/supportRoutes.js"
-import adminSupportRoutes from './routes/adminSupportRoutes.js'
+import supportRoutes from "./routes/supportRoutes.js";
+import adminSupportRoutes from "./routes/adminSupportRoutes.js";
 import waitlistRoutes from "./routes/waitlistRoutes.js";
 import adminBookingsRoute from "./routes/adminBookings.js";
-
 
 dotenv.config();
 
@@ -36,17 +35,23 @@ app.use(
   })
 );
 
-// 🔔 Cal webhook: use raw JSON body for signature + payload parsing
+/* ------------------------------------------
+   RAW BODY FOR CAL WEBHOOK
+-------------------------------------------*/
 app.use(
   "/api/cal/webhook",
   express.raw({ type: "application/json" }),
   calWebhookRoutes
 );
 
-// Normal JSON parser for everything else
+/* ------------------------------------------
+   NORMAL JSON PARSER
+-------------------------------------------*/
 app.use(express.json());
 
-/* 🔍 Global request logger */
+/* ------------------------------------------
+   REQUEST LOGGER
+-------------------------------------------*/
 app.use((req, res, next) => {
   console.log(`[REQ] ${req.method} ${req.url}`);
   next();
@@ -98,24 +103,6 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// user section admin
-app.use("/api/users", userRoutes);
-
-// for calendar-event section
-app.use("/api/calendar-events", calendarEventRoutes);
-
-// for stripe payment for the donation section
-app.use("/api/donate", donateRoutes);
-
-//support users
-app.use("/api/support", supportRoutes);
-
-//adminsupport
-app.use("/api/admin/support", adminSupportRoutes);
-
-//routes for the fetch the booking for the admin
-app.use("/api/admin/bookings", adminBookingsRoute);
-
 // LOGIN
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
@@ -164,7 +151,40 @@ app.post("/api/login", async (req, res) => {
 });
 
 /* ------------------------------------------
-   Admin Auth Middleware
+   USER-AUTH MIDDLEWARE (NON-ADMIN)
+-------------------------------------------*/
+function requireAuth(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded || !decoded.id) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid token" });
+    }
+
+    req.user = decoded; // { id, email, role }
+    next();
+  } catch (err) {
+    console.error("Auth error:", err);
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired token" });
+  }
+}
+
+/* ------------------------------------------
+   ADMIN-ONLY MIDDLEWARE
 -------------------------------------------*/
 function requireAdmin(req, res, next) {
   try {
@@ -197,7 +217,7 @@ function requireAdmin(req, res, next) {
 }
 
 /* ------------------------------------------
-   Admin: List bookings
+   ADMIN BOOKINGS
 -------------------------------------------*/
 app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
   try {
@@ -230,16 +250,34 @@ app.get("/api/admin/bookings", requireAdmin, async (req, res) => {
 });
 
 /* ------------------------------------------
-   Routes
+   NORMAL ROUTES
 -------------------------------------------*/
+app.use("/api/users", userRoutes);
+app.use("/api/calendar-events", calendarEventRoutes);
+app.use("/api/donate", donateRoutes);
+app.use("/api/support", supportRoutes);
+app.use("/api/admin/support", adminSupportRoutes);
+app.use("/api/admin/bookings", adminBookingsRoute);
 app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
-app.use("/api/bookings", bookingRoutes);
+
+/* ------------------------------------------
+   🚨 BOOKINGS REQUIRE LOGIN
+-------------------------------------------*/
+app.use("/api/bookings", requireAuth, bookingRoutes);
+
+/* ------------------------------------------
+   CAL ROUTES
+-------------------------------------------*/
 app.use("/api/cal", calRoutes);
+
+/* ------------------------------------------
+   WAITLIST
+-------------------------------------------*/
 app.use("/api/waitlist", waitlistRoutes);
 
 /* ------------------------------------------
-   Start Server
+   START SERVER
 -------------------------------------------*/
 const PORT = process.env.PORT || 5000;
 
