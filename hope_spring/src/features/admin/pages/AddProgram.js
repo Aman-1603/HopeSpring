@@ -26,6 +26,11 @@ const normalizeCategory = (v) =>
 /** subcategories for Gentle Exercise */
 const GENTLE_EXERCISE_SUBCATS = ["Meditation", "Yoga", "Tai Chi", "Qi Gong"];
 
+// Location handling
+const LOCATION_TYPE_ONLINE = "online_zoom";
+const LOCATION_TYPE_OTHER = "other";
+const LOCATION_DEFAULT_LABEL = "Online (Zoom)";
+
 const emptyForm = {
   id: null,
   title: "",
@@ -33,7 +38,13 @@ const emptyForm = {
   category: "",
   subcategory: "",
 
+  // legacy location string (still sent to backend)
   location: "",
+
+  // new UI flags
+  locationType: LOCATION_TYPE_ONLINE,
+  locationOther: "",
+
   maxCapacity: "",
   instructor: "",
   status: "upcoming",
@@ -116,13 +127,34 @@ export default function ProgramManagement() {
       // ignore
     }
 
+    const existingLocation = p.location || "";
+    let locationType = LOCATION_TYPE_ONLINE;
+    let locationOther = "";
+
+    if (!existingLocation) {
+      locationType = LOCATION_TYPE_ONLINE;
+      locationOther = "";
+    } else if (existingLocation.toLowerCase().includes("zoom")) {
+      // treat anything containing "zoom" as online Zoom
+      locationType = LOCATION_TYPE_ONLINE;
+      locationOther = "";
+    } else {
+      locationType = LOCATION_TYPE_OTHER;
+      locationOther = existingLocation;
+    }
+
     setFormData({
       id: p.id,
       title: p.title || "",
       description: p.description || "",
       category: p.category || "",
       subcategory: p.subcategory || "",
-      location: p.location || "",
+
+      // keep legacy string in case we ever need it
+      location: existingLocation || "",
+      locationType,
+      locationOther,
+
       maxCapacity: p.max_capacity ?? "",
       instructor: p.instructor || "",
       status: p.status || "upcoming",
@@ -192,7 +224,7 @@ export default function ProgramManagement() {
     const normalizedCategoryValue = normalizeCategory(formData.category);
     const isSupportGroup = normalizedCategoryValue === "support_group";
     const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
-   // const isCounselling = normalizedCategoryValue === "counselling";
+    // const isCounselling = normalizedCategoryValue === "counselling";
 
     // any category that should automatically be wired to Cal
     // NOTE: counselling uses Cal as a request system, but we don't
@@ -208,7 +240,7 @@ export default function ProgramManagement() {
       "title",
       "description",
       "category",
-      "location",
+      // location handled separately via locationType + locationOther
       "maxCapacity",
       "instructor",
       "durationMinutes", // duration required so Cal length is never undefined
@@ -216,6 +248,19 @@ export default function ProgramManagement() {
 
     for (const f of baseRequired) {
       if (!formData[f]) return alert("Fill all required fields.");
+    }
+
+    // validate location based on type
+    let finalLocation = LOCATION_DEFAULT_LABEL;
+    if (formData.locationType === LOCATION_TYPE_OTHER) {
+      const trimmed = (formData.locationOther || "").trim();
+      if (!trimmed) {
+        alert("Please enter a location for 'Other'.");
+        return;
+      }
+      finalLocation = trimmed;
+    } else {
+      finalLocation = LOCATION_DEFAULT_LABEL;
     }
 
     if (isSupportGroup) {
@@ -238,7 +283,7 @@ export default function ProgramManagement() {
       date: null,
       time: null,
 
-      location: formData.location.trim(),
+      location: finalLocation.trim(),
       maxCapacity: parseInt(formData.maxCapacity, 10),
       instructor: formData.instructor.trim(),
       status: formData.status,
@@ -746,13 +791,44 @@ export default function ProgramManagement() {
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Location *">
-                  <input
-                    className="w-full border rounded-xl px-3 py-2 text-sm"
-                    value={formData.location}
-                    onChange={(e) =>
-                      setFormData((p) => ({ ...p, location: e.target.value }))
-                    }
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      className="w-full border rounded-xl px-3 py-2 text-sm"
+                      value={formData.locationType}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          locationType: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value={LOCATION_TYPE_ONLINE}>
+                        {LOCATION_DEFAULT_LABEL}
+                      </option>
+                      <option value={LOCATION_TYPE_OTHER}>Other</option>
+                    </select>
+
+                    {formData.locationType === LOCATION_TYPE_OTHER ? (
+                      <input
+                        className="w-full border rounded-xl px-3 py-2 text-sm"
+                        value={formData.locationOther}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            locationOther: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. In-person address or room"
+                      />
+                    ) : (
+                      <input
+                        className="w-full border rounded-xl px-3 py-2 text-sm bg-gray-50 text-gray-500"
+                        value={LOCATION_DEFAULT_LABEL}
+                        disabled
+                        readOnly
+                      />
+                    )}
+                  </div>
                 </Field>
 
                 <Field label="Max Capacity *">

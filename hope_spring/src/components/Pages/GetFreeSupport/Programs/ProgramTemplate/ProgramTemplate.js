@@ -12,6 +12,9 @@ const BOOKINGS_API = "/api/bookings/programs";
 const normalize = (v) =>
   (v || "").trim().toLowerCase().replace(/\s+/g, "_");
 
+const isZoomLocation = (loc) =>
+  (loc || "").toLowerCase().includes("zoom");
+
 /* ---------- small UI atoms ---------- */
 
 const HeroPill = ({ children }) => (
@@ -100,6 +103,8 @@ const ProgramCard = ({
       ? uniqueFullDates.map((d) => fmtMonthDay(d)).join(", ")
       : "";
 
+  const zoomLoc = isZoomLocation(p.location);
+
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5 shadow-sm hover:shadow-md transition">
       <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -143,6 +148,13 @@ const ProgramCard = ({
           You can join the waitlist for those dates.
         </p>
       )}
+
+      {/* Location row – now clearly shows Online vs In-person */}
+      <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700">
+          {zoomLoc ? "Online (Zoom)" : p.location || "Location TBA"}
+        </span>
+      </div>
 
       {/* CTA logic */}
       {!linked ? (
@@ -257,7 +269,6 @@ export default function ProgramTemplate({ config }) {
   const { user, token } = useAuth();
 
   const {
-    //slug = "meditation",
     categoryName = "Gentle Exercise",
     subcategoryName = "Meditation",
 
@@ -401,14 +412,13 @@ export default function ProgramTemplate({ config }) {
   useEffect(() => {
     if (!programs || programs.length === 0) return;
 
-    // Counselling: we don't care about capacity / summary at all
     if (isCounsellingCategory) {
       setSummaryByProgram({});
       return;
     }
 
     if (!authToken) {
-      setSummaryByProgram({}); // but summaries aren't used heavily anymore
+      setSummaryByProgram({});
       return;
     }
 
@@ -454,7 +464,6 @@ export default function ProgramTemplate({ config }) {
   useEffect(() => {
     if (!programs || programs.length === 0) return;
 
-    // Counselling: we are not doing per-slot capacity / "full" logic
     if (isCounsellingCategory) {
       setSlotUsageByProgram({});
       return;
@@ -508,7 +517,7 @@ export default function ProgramTemplate({ config }) {
 
   /* ---- derive full dates per program from slot-usage ---- */
   const getFullDatesForProgram = (programId) => {
-    if (isCounsellingCategory) return []; // counselling ignores this
+    if (isCounsellingCategory) return [];
 
     const usage = slotUsageByProgram[programId];
     if (!usage || !Array.isArray(usage.slots)) return [];
@@ -540,8 +549,6 @@ export default function ProgramTemplate({ config }) {
   );
 
   const openBookingFor = (p) => {
-    // If you want counselling to be open without login, we can relax this,
-    // but for now we keep same behavior as other programs.
     if (!loggedInUser || !authToken) {
       redirectToLogin();
       return;
@@ -789,7 +796,9 @@ export default function ProgramTemplate({ config }) {
                       onRegister={openBookingFor}
                       calDates={slotInfo.dates}
                       isFull={isUiFull}
-                      onJoinWaitlist={isCounsellingCategory ? undefined : joinWaitlistFor}
+                      onJoinWaitlist={
+                        isCounsellingCategory ? undefined : joinWaitlistFor
+                      }
                       fullDates={fullDates}
                       mode={isCounsellingCategory ? "counselling" : "default"}
                     />
@@ -838,7 +847,9 @@ export default function ProgramTemplate({ config }) {
                       onRegister={openBookingFor}
                       calDates={slotInfo.dates}
                       isFull={isUiFull}
-                      onJoinWaitlist={isCounsellingCategory ? undefined : joinWaitlistFor}
+                      onJoinWaitlist={
+                        isCounsellingCategory ? undefined : joinWaitlistFor
+                      }
                       fullDates={fullDates}
                       mode={isCounsellingCategory ? "counselling" : "default"}
                     />

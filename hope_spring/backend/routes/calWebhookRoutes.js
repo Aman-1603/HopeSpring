@@ -22,6 +22,14 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Invalid JSON" });
     }
 
+    // ====== TEMP: Zoom investigation logging (read-only) ======
+    if (process.env.LOG_CAL_WEBHOOKS === "true") {
+      console.log("==== [Cal Webhook] RAW JSON START ====");
+      console.dir(json, { depth: 10 });
+      console.log("==== [Cal Webhook] RAW JSON END ====");
+    }
+    // ====== END TEMP ======
+
     const trigger =
       json?.triggerEvent || json?.event || json?.type || null;
 
@@ -36,6 +44,23 @@ router.post("/", async (req, res) => {
       return res
         .status(200)
         .json({ ok: true, skipped: "no trigger/payload" });
+    }
+
+    // Extra focused logging to help debug bookings / Zoom URLs
+    if (
+      process.env.LOG_CAL_WEBHOOKS === "true" &&
+      String(trigger).startsWith("BOOKING_")
+    ) {
+      try {
+        console.log("---- [Cal Webhook] Booking debug fields ----");
+        console.log("trigger:", trigger);
+        console.log("payload.location:", payload.location || null);
+        console.log("payload.metadata:", payload.metadata || null);
+        console.log("payload.videoCallData:", payload.videoCallData || null);
+        console.log("---- [Cal Webhook] End booking debug fields ----");
+      } catch (e) {
+        console.warn("[Cal webhook] booking debug logging failed:", e);
+      }
     }
 
     console.log("[Cal webhook] trigger:", trigger);
@@ -213,11 +238,12 @@ async function handleBookingRequested(payload) {
       attendee_name,
       attendee_email,
       seat_count,
+      zoom_url,
       status,
       raw,
       created_at
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',$9,NOW())
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PENDING',$10,NOW())
     ON CONFLICT (cal_booking_id, attendee_email)
     DO UPDATE SET
       program_id     = EXCLUDED.program_id,
@@ -227,6 +253,7 @@ async function handleBookingRequested(payload) {
       attendee_name  = EXCLUDED.attendee_name,
       attendee_email = EXCLUDED.attendee_email,
       seat_count     = EXCLUDED.seat_count,
+      zoom_url       = EXCLUDED.zoom_url,
       status         = 'PENDING',
       raw            = EXCLUDED.raw
     `,
@@ -239,6 +266,7 @@ async function handleBookingRequested(payload) {
       attendeeName,
       attendeeEmail,
       seatCount,
+      norm.zoom_url || null,
       norm.raw || payload,
     ]
   );
@@ -311,11 +339,12 @@ async function handleBookingCreated(payload) {
       attendee_name,
       attendee_email,
       seat_count,
+      zoom_url,
       status,
       raw,
       created_at
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACCEPTED',$9,NOW())
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'ACCEPTED',$10,NOW())
     ON CONFLICT (cal_booking_id, attendee_email)
     DO UPDATE SET
       program_id     = EXCLUDED.program_id,
@@ -325,6 +354,7 @@ async function handleBookingCreated(payload) {
       attendee_name  = EXCLUDED.attendee_name,
       attendee_email = EXCLUDED.attendee_email,
       seat_count     = EXCLUDED.seat_count,
+      zoom_url       = EXCLUDED.zoom_url,
       status         = 'ACCEPTED',
       raw            = EXCLUDED.raw
     `,
@@ -337,6 +367,7 @@ async function handleBookingCreated(payload) {
       attendeeName,
       attendeeEmail,
       seatCount,
+      norm.zoom_url || null,
       norm.raw || payload,
     ]
   );

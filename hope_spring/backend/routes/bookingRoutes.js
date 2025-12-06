@@ -27,6 +27,8 @@ export function normalizeCalBooking(calPayload) {
     attendees = [],
     metadata = {},
     status,
+    location,
+    videoCallData, // <-- Zoom lives here as well
   } = calPayload;
 
   const first = attendees[0] || {};
@@ -35,15 +37,30 @@ export function normalizeCalBooking(calPayload) {
   // each row is one person. seat_count is therefore always 1.
   const seat_count = 1;
 
+  // Zoom join URL:
+  // - v2 payload.videoCallData.url
+  // - or metadata.videoCallUrl (from apps / workflows)
+  const zoom_url =
+    (videoCallData && videoCallData.url) ||
+    (metadata && metadata.videoCallUrl) ||
+    null;
+
   return {
     cal_booking_id: uid || id || bookingId || null,
     event_start: startTime || start || null,
     event_end: endTime || end || null,
+
     attendee_name: first.name || null,
     attendee_email: first.email || null,
+
     user_id: metadata.userId || metadata.memberId || null,
     seat_count,
     status: status || "ACCEPTED",
+
+    // extra fields we may want later:
+    location: location || null,
+    zoom_url, // <-- used by calWebhookRoutes to persist into bookings.zoom_url
+
     raw: calPayload,
   };
 }
@@ -504,8 +521,6 @@ router.get("/programs/:id/slot-usage", async (req, res) => {
     console.error("❌ Error loading slot usage:", err);
     return res.status(500).json({ error: "Failed to load slot usage" });
   }
-
-  
 });
 
 /* ============================================================
@@ -556,6 +571,5 @@ router.get("/past", async (req, res) => {
       .json({ success: false, message: "Server error" });
   }
 });
-
 
 export default router;
