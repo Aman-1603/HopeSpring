@@ -65,6 +65,7 @@ useEffect(() => {
           instructor: b.instructor || "N/A",
           location: b.location || "N/A",
           status: b.status || "upcoming",
+          startDateTime: b.event_start || null,
         };
       });
 
@@ -81,32 +82,65 @@ useEffect(() => {
 }, [user]);
 
 
-  const [announcements] = useState([
-    {
-      id: 1,
-      title: "New Wellness Program Launching",
-      description:
-        "Join our new holistic wellness program starting next month. Limited spots available!",
-      link: "/programs",
-      date: "2024-01-15",
-    },
-    {
-      id: 2,
-      title: "Community Fundraiser Event",
-      description:
-        "Help us raise funds for our community support initiatives. Every contribution counts.",
-      link: null,
-      date: "2024-01-12",
-    },
-    {
-      id: 3,
-      title: "Updated Support Resources",
-      description:
-        "We've added new meditation guides and nutrition plans to our resources library.",
-      link: "/resources",
-      date: "2024-01-10",
-    },
-  ]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [announcementsError, setAnnouncementsError] = useState(null);
+
+ // 🔹 Fetch latest published announcements for dashboard
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        setLoadingAnnouncements(true);
+        setAnnouncementsError("");
+
+        const res = await fetch("/api/announcements");
+        let data = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+
+        if (!res.ok) {
+          throw new Error(
+            (data && (data.message || data.error)) ||
+              "Failed to load announcements"
+          );
+        }
+
+        const all = Array.isArray(data) ? data : data.announcements || [];
+
+        // Show only published / active announcements
+        const published = all.filter(
+          (a) =>
+            a.published === true ||
+            a.is_published === true ||
+            a.status === "published" ||
+            a.is_active === true
+        );
+
+        const mapped = published.map((a) => ({
+          id: a.id,
+          title: a.title || a.heading || "Announcement",
+          description: a.description || a.body || a.content || "",
+          link: a.link || a.link_url || null,
+          date: a.created_date || a.created_at || a.start_date || null,
+          category: a.category || a.type || null,
+          important: a.important || a.is_important || a.pinned || false,
+        }));
+
+        setAnnouncements(mapped);
+      } catch (err) {
+        console.error("Announcements fetch error:", err);
+        setAnnouncementsError(err.message || "Failed to load announcements.");
+        toast.error("Failed to load announcements.");
+      } finally {
+        setLoadingAnnouncements(false);
+      }
+    };
+
+    fetchAnnouncements();
+  }, []);
 
   const [recommendations] = useState([
     {
@@ -202,7 +236,9 @@ useEffect(() => {
 
           <div className="mt-8 space-y-8">
             <MyPrograms programs={programs} loadingPrograms={loadingPrograms} />
-            <AnnouncementsFeed announcements={announcements} />
+            <AnnouncementsFeed announcements={announcements}
+            loading={loadingAnnouncements}
+            error={announcementsError} />
             <Recommendations
               recommendations={recommendations}
               onAdd={handleAddRecommendationClick} // 🔹 use popup handler

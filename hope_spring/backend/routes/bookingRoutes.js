@@ -504,6 +504,58 @@ router.get("/programs/:id/slot-usage", async (req, res) => {
     console.error("❌ Error loading slot usage:", err);
     return res.status(500).json({ error: "Failed to load slot usage" });
   }
+
+  
 });
+
+/* ============================================================
+   GET /api/bookings/past
+   Returns past sessions for the currently logged-in user
+============================================================ */
+router.get("/past", async (req, res) => {
+  try {
+    // requireAuth (in server.js) should already have set req.user
+    const userId = req.user?.id;
+
+    if (!userId || !Number.isFinite(Number(userId))) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required" });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    const result = await pool.query(
+      `
+      SELECT
+        b.*,
+        p.title   AS program_title,
+        p.category AS program_category
+      FROM bookings b
+      LEFT JOIN programs p ON p.id = b.program_id
+      WHERE b.user_id = $1
+        AND b.event_start IS NOT NULL
+        AND b.event_start < $2
+        AND (
+          LOWER(b.status) IN ('accepted','confirmed','booked','attended','completed')
+          OR b.status IS NULL
+        )
+      ORDER BY b.event_start DESC NULLS LAST, b.created_at DESC
+      `,
+      [userId, nowIso]
+    );
+
+    return res.json({
+      success: true,
+      bookings: result.rows,
+    });
+  } catch (err) {
+    console.error("❌ Fetch past bookings failed:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error" });
+  }
+});
+
 
 export default router;
