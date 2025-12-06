@@ -1,22 +1,23 @@
 import { useState } from "react";
-import { Calendar, Clock, MapPin, User, Eye, X, Video, CalendarPlus } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  Eye,
+  X,
+  Video,
+  CalendarPlus,
+} from "lucide-react";
 
-const MyPrograms = ({ programs }) => {
+const MyPrograms = ({ programs, loadingPrograms }) => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  if (!programs || programs.length === 0) {
-    return (
-      <section className="space-y-6">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          My Programs
-        </h2>
-        <p className="text-gray-600">You have no programs scheduled.</p>
-      </section>
-    );
-  }
+  const hasPrograms = Array.isArray(programs) && programs.length > 0;
 
   const handleViewDetails = (program) => {
+    if (!program) return;
     setSelectedProgram(program);
     setIsDetailsOpen(true);
   };
@@ -34,22 +35,81 @@ const MyPrograms = ({ programs }) => {
   const handleAddToGoogleCalendar = () => {
     if (!selectedProgram) return;
 
-    const title = encodeURIComponent(selectedProgram.title);
+    const title = encodeURIComponent(selectedProgram.title || "HopeSpring Program");
     const details = encodeURIComponent(
-      `Instructor: ${selectedProgram.instructor}\nLocation: ${selectedProgram.location}`
+      `Instructor: ${selectedProgram.instructor || "N/A"}\nLocation: ${
+        selectedProgram.location || "HopeSpring"
+      }`
     );
 
-    const dateObj = new Date(selectedProgram.date + " " + selectedProgram.time);
-    const start = dateObj.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-    const end = new Date(dateObj.getTime() + 60 * 60 * 1000)
-      .toISOString()
-      .replace(/[-:]/g, "")
-      .split(".")[0] + "Z";
+    let googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}`;
 
-    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${start}/${end}`;
+    // Try to construct a Date from either ISO start or date + time
+    let startDate = null;
 
+    if (selectedProgram.startDateTime) {
+      // if you later map a raw ISO string from backend
+      startDate = new Date(selectedProgram.startDateTime);
+    } else if (selectedProgram.date && selectedProgram.time) {
+      // This can be flaky because date is already "12/05/2025" style,
+      // but we still try.
+      startDate = new Date(`${selectedProgram.date} ${selectedProgram.time}`);
+    } else if (selectedProgram.date) {
+      startDate = new Date(selectedProgram.date);
+    }
+
+    if (startDate && !isNaN(startDate.getTime())) {
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1h
+
+      const formatForGoogle = (d) =>
+        d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+      const start = formatForGoogle(startDate);
+      const end = formatForGoogle(endDate);
+
+      googleUrl += `&dates=${start}/${end}`;
+    }
+    // ❗ IMPORTANT: even if date parsing fails, we still open the URL
     window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
+
+
+  // 🔹 Loading state
+  if (loadingPrograms) {
+    return (
+      <section className="space-y-6">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          My Programs
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6 animate-pulse space-y-3"
+            >
+              <div className="h-5 bg-gray-200 rounded w-2/3" />
+              <div className="h-4 bg-gray-200 rounded w-1/3" />
+              <div className="h-4 bg-gray-200 rounded w-1/2" />
+              <div className="h-4 bg-gray-200 rounded w-1/4" />
+              <div className="h-9 bg-gray-200 rounded mt-4" />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  // 🔹 No programs
+  if (!hasPrograms) {
+    return (
+      <section className="space-y-6">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          My Programs
+        </h2>
+        <p className="text-gray-600">You have no programs scheduled.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">
@@ -67,13 +127,13 @@ const MyPrograms = ({ programs }) => {
             <div className="flex items-start justify-between mb-4">
               <h3 className="text-lg font-semibold">{program.title}</h3>
               <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
                   program.status === "upcoming"
                     ? "bg-primary/10 text-primary"
                     : "bg-gray-200 text-gray-600"
                 }`}
               >
-                {program.status}
+                {program.status || "upcoming"}
               </span>
             </div>
 
@@ -129,33 +189,40 @@ const MyPrograms = ({ programs }) => {
             </h2>
 
             <span
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
+              className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
                 selectedProgram.status === "upcoming"
                   ? "bg-primary/10 text-primary"
                   : "bg-gray-200 text-gray-600"
               }`}
             >
-              {selectedProgram.status}
+              {selectedProgram.status || "upcoming"}
             </span>
+
+            {/* Optional category/description if provided */}
+            {selectedProgram.category && (
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {selectedProgram.category}
+              </p>
+            )}
+            {selectedProgram.description && (
+              <p className="mt-1 text-sm text-gray-600">
+                {selectedProgram.description}
+              </p>
+            )}
 
             <div className="space-y-3 text-sm mt-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500">Date</p>
                   <p className="font-medium text-gray-800">
-                    {new Date(selectedProgram.date).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {selectedProgram.date|| "TBD"}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-xs text-gray-500">Time</p>
                   <p className="font-medium text-gray-800">
-                    {selectedProgram.time}
+                    {selectedProgram.time || "TBD"}
                   </p>
                 </div>
               </div>
@@ -164,13 +231,13 @@ const MyPrograms = ({ programs }) => {
                 <div>
                   <p className="text-xs text-gray-500">Instructor</p>
                   <p className="font-medium text-gray-800">
-                    {selectedProgram.instructor}
+                    {selectedProgram.instructor || "N/A"}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Location</p>
                   <p className="font-medium text-gray-800">
-                    {selectedProgram.location}
+                    {selectedProgram.location || "HopeSpring"}
                   </p>
                 </div>
               </div>
@@ -178,7 +245,6 @@ const MyPrograms = ({ programs }) => {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-
               {/* Close */}
               <button
                 onClick={handleCloseDetails}
@@ -187,7 +253,7 @@ const MyPrograms = ({ programs }) => {
                 Close
               </button>
 
-              {/* Small Google Calendar Button */}
+              {/* Add to Calendar */}
               <button
                 onClick={handleAddToGoogleCalendar}
                 className="px-3 py-2 w-full sm:w-auto text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 transition flex items-center justify-center gap-2"
@@ -196,9 +262,9 @@ const MyPrograms = ({ programs }) => {
                 Add to Calendar
               </button>
 
-              {/* Blue Active Zoom Button */}
+              {/* Join Zoom */}
               <button
-                onClick={selectedProgram.zoomLink ? handleJoinZoom : null}
+                onClick={selectedProgram.zoomLink ? handleJoinZoom : undefined}
                 disabled={!selectedProgram.zoomLink}
                 className={`px-4 py-2 w-full sm:w-auto text-sm rounded-lg flex items-center justify-center gap-2 transition 
                   ${
@@ -211,7 +277,6 @@ const MyPrograms = ({ programs }) => {
                 <Video className="w-4 h-4" />
                 Join Zoom
               </button>
-
             </div>
           </div>
         </div>
