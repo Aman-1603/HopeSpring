@@ -66,6 +66,7 @@ useEffect(() => {
           location: b.location || "N/A",
           status: b.status || "upcoming",
           startDateTime: b.event_start || null,
+          zoomLink: b.zoom_url || null,
         };
       });
 
