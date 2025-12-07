@@ -8,7 +8,7 @@ const joyfulArtPracticeConfig = {
   // Any program where normalize(category) === normalize("Art")
   // will show on this page.
   categoryName: "Art",
-  subcategoryName: "",
+  subcategoryName: "Practice",
 
   /* ===== Hero ===== */
   heroImage: "/images/art-practice-banner.png",

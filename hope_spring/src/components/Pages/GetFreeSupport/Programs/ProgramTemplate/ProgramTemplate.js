@@ -329,6 +329,7 @@ export default function ProgramTemplate({ config }) {
         const pageCat = normalize(categoryName);
         const pageSub = normalize(subcategoryName);
 
+        // 1) filter by category + subcategory
         const filtered = all.filter((p) => {
           const cat = normalize(p.category);
           const sub = normalize(p.subcategory);
@@ -337,8 +338,15 @@ export default function ProgramTemplate({ config }) {
           return sub === pageSub;
         });
 
+        // 2) PUBLIC VISIBILITY FILTER:
+        //    - only active programs
+        //    - only "upcoming" status
+        const visible = filtered.filter(
+          (p) => p.is_active !== false && p.status === "upcoming"
+        );
+
         const withOccs = await Promise.all(
-          filtered.map(async (p) => {
+          visible.map(async (p) => {
             try {
               const oRes = await axios.get(
                 `${PROGRAMS_API}/${p.id}/occurrences`
