@@ -10,7 +10,7 @@ import {
   CalendarPlus,
 } from "lucide-react";
 
-const MyPrograms = ({ programs, loadingPrograms }) => {
+const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -35,7 +35,9 @@ const MyPrograms = ({ programs, loadingPrograms }) => {
   const handleAddToGoogleCalendar = () => {
     if (!selectedProgram) return;
 
-    const title = encodeURIComponent(selectedProgram.title || "HopeSpring Program");
+    const title = encodeURIComponent(
+      selectedProgram.title || "HopeSpring Program"
+    );
     const details = encodeURIComponent(
       `Instructor: ${selectedProgram.instructor || "N/A"}\nLocation: ${
         selectedProgram.location || "HopeSpring"
@@ -73,6 +75,42 @@ const MyPrograms = ({ programs, loadingPrograms }) => {
     window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
 
+  const handleCancelBooking = async (program) => {
+    if (!program || !program.id) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel "${program.title}"?`
+    );
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem("hs_token");
+
+      const res = await fetch(`/api/bookings/${program.id}/cancel`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        console.error("Cancel booking error:", data);
+        alert(data.message || "Failed to cancel booking");
+        return;
+      }
+
+      // update state in parent
+      if (onCancelProgram) {
+        onCancelProgram(program.id);
+      }
+    } catch (err) {
+      console.error("Cancel booking request failed:", err);
+      alert("Something went wrong cancelling this program.");
+    }
+  };
 
   // 🔹 Loading state
   if (loadingPrograms) {
@@ -156,13 +194,29 @@ const MyPrograms = ({ programs, loadingPrograms }) => {
               </div>
             </div>
 
-            <button
-              onClick={() => handleViewDetails(program)}
-              className="w-full mt-4 flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-50 transition"
-            >
-              <Eye className="w-4 h-4" />
-              View Details
-            </button>
+            <div className="space-y-2 text-sm text-gray-600">
+              {/* date, time, instructor, location */}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                onClick={() => handleViewDetails(program)}
+                className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-50 transition"
+              >
+                <Eye className="w-4 h-4" />
+                View Details
+              </button>
+
+              {(program.status === "upcoming" ||
+                program.status === "ACCEPTED") && (
+                <button
+                  onClick={() => handleCancelBooking(program)}
+                  className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50 transition"
+                >
+                  Cancel Booking
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -215,7 +269,7 @@ const MyPrograms = ({ programs, loadingPrograms }) => {
                 <div>
                   <p className="text-xs text-gray-500">Date</p>
                   <p className="font-medium text-gray-800">
-                    {selectedProgram.date|| "TBD"}
+                    {selectedProgram.date || "TBD"}
                   </p>
                 </div>
 

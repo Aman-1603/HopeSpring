@@ -3,6 +3,7 @@ import express from "express";
 import { pool } from "../db.js";
 import { confirmBooking, declineBooking } from "../lib/calClient.js";
 
+
 const router = express.Router();
 
 /* ------------------------------------------
@@ -32,6 +33,8 @@ export function normalizeCalBooking(calPayload) {
   } = calPayload;
 
   const first = attendees[0] || {};
+
+
 
   // With the composite (cal_booking_id, attendee_email) model,
   // each row is one person. seat_count is therefore always 1.
@@ -571,5 +574,90 @@ router.get("/past", async (req, res) => {
       .json({ success: false, message: "Server error" });
   }
 });
+/* ============================================================
+   CANCEL A BOOKING (USER)
+   PATCH /api/bookings/:bookingId/cancel
+   - Only owner can cancel
+   - Only if status is an "active" seat (accepted/confirmed/booked)
+   - After this, participants count drops => seat freed
+============================================================ */
+router.patch("/:bookingId/cancel", async (req, res) => {
+  try {
+    // requireAuth is enforced at mount level in server.js
+    const user = req.user;
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Login required" });
+    }
+
+    const bookingId = Number(req.params.bookingId);
+    if (!bookingId || !Number.isFinite(bookingId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid booking id" });
+    }
+
+    // 1. Fetch booking
+    const selectSql = `
+      SELECT
+        id,
+        user_id,
+        status,
+        program_id
+      FROM bookings
+      WHERE id = $1
+    `;
+    console.log("[CANCEL] selectSql:\n", selectSql);
+
+    const { rows } = await pool.query(selectSql, [bookingId]);
+
+    if (rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const booking = rows[0];
+
+    // 2. Check ownership
+    if (booking.user_id !== user.id) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not allowed to cancel this booking" });
+    }
+
+    // 3. Only cancel if it's actually taking a seat
+    //    (your other queries treat these as "active" statuses)
+    const statusLower = (booking.status || "").toLowerCase();
+    const activeSeatStatuses = ["accepted", "confirmed", "booked"];
+
+    if (!activeSeatStatuses.includes(statusLower)) {
+      return res.status(400).json({
+        success: false,
+        message: `Booking is not cancellable (current status: ${booking.status})`,
+      });
+    }
+
+    // 4. Update status -> CANCELLED
+    const updateSql = `
+      UPDATE bookings
+      SET status = 'CANCELLED'
+      WHERE id = $1
+    `;
+    console.log("[CANCEL] updateSql:\n", updateSql);
+
+    await pool.query(updateSql, [bookingId]);
+
+    // No need to touch programs table:
+    // participants are computed from COUNT(*) WHERE status IN ('accepted','confirmed','booked')
+
+    return res.json({ success: true, message: "Booking cancelled" });
+  } catch (err) {
+    console.error("❌ Cancel booking failed:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 export default router;
