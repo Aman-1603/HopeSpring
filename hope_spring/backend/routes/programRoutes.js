@@ -1,7 +1,7 @@
 // backend/routes/programRoutes.js
 import express from "express";
 import { pool } from "../db.js";
-import { getSlotsForEventType } from "../lib/calClient.js";
+import { getSlotsForEventType, updateEventType } from "../lib/calClient.js";
 
 const router = express.Router();
 
@@ -59,6 +59,38 @@ function nyLocalToUtc(dateStr, timeStr, timeZone = TZ) {
 
   // Shift back to get true UTC instant for the local time
   return new Date(utcGuess.getTime() - offsetMin * 60000);
+}
+
+/* small helper: deactivate Cal event type when archiving a program */
+async function deactivateCalEventTypeIfAny(program) {
+  const eventTypeId = program?.cal_event_type_id;
+  if (!eventTypeId) return;
+
+  try {
+    console.log(
+      "[Programs] Deactivating Cal event type for program",
+      program.id,
+      "eventTypeId=",
+      eventTypeId
+    );
+
+    await updateEventType(eventTypeId, {
+      hidden: true,
+      bookingWindow: {
+        disabled: true,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "❌ Failed to deactivate Cal event type for program",
+      program.id,
+      "eventTypeId=",
+      eventTypeId,
+      ":",
+      err.message
+    );
+    // we DO NOT throw here – DB archive should still succeed
+  }
 }
 
 /* =========================================================
@@ -137,7 +169,7 @@ router.get("/support-groups", async (req, res) => {
         p.subcategory,
         COALESCE(b.count_accepted, 0) AS participants
       FROM programs p
-      LEFT JOIN (
+      LEFT JOin (
         SELECT
           program_id,
           COUNT(*) FILTER (WHERE status = 'ACCEPTED') AS count_accepted
@@ -207,6 +239,99 @@ router.delete("/categories/:name", async (req, res) => {
 });
 
 /* =========================================================
+   CATEGORY-SUBCATEGORY MANAGEMENT (Option A)
+   - backed by category_subcategories table
+========================================================= */
+
+// Get all explicit subcategories for a category
+router.get("/categories/:name/subcategories", async (req, res) => {
+  try {
+    const categoryName = decodeURIComponent(req.params.name);
+
+    const result = await pool.query(
+      `
+      SELECT id, category_name, name
+      FROM category_subcategories
+      WHERE category_name = $1
+      ORDER BY name ASC
+      `,
+      [categoryName]
+    );
+
+    res.json({
+      category: categoryName,
+      subcategories: result.rows,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching category subcategories:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Add a subcategory for a specific category
+router.post("/categories/:name/subcategories", async (req, res) => {
+  try {
+    const categoryName = decodeURIComponent(req.params.name);
+    const { name } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: "Subcategory name is required" });
+    }
+
+    const trimmed = String(name).trim();
+
+    const insert = await pool.query(
+      `
+      INSERT INTO category_subcategories (category_name, name)
+      VALUES ($1, $2)
+      ON CONFLICT (category_name, name) DO NOTHING
+      RETURNING *
+      `,
+      [categoryName, trimmed]
+    );
+
+    if (insert.rows.length === 0) {
+      // already exists
+      return res.status(200).json({
+        existing: true,
+        category: categoryName,
+        name: trimmed,
+      });
+    }
+
+    res.status(201).json(insert.rows[0]);
+  } catch (err) {
+    console.error("❌ Error adding category subcategory:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Delete a subcategory for a specific category
+router.delete("/categories/:name/subcategories/:subName", async (req, res) => {
+  try {
+    const categoryName = decodeURIComponent(req.params.name);
+    const subName = decodeURIComponent(req.params.subName);
+
+    await pool.query(
+      `
+      DELETE FROM category_subcategories
+      WHERE category_name = $1 AND name = $2
+      `,
+      [categoryName, subName]
+    );
+
+    res.json({
+      message: "Subcategory deleted",
+      category: categoryName,
+      name: subName,
+    });
+  } catch (err) {
+    console.error("❌ Error deleting category subcategory:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* =========================================================
    DELETE SINGLE OCCURRENCE
 ========================================================= */
 router.delete("/occurrence/:occId", async (req, res) => {
@@ -230,12 +355,10 @@ router.get("/calendar", async (req, res) => {
     const { from, to } = req.query;
 
     if (!from || !to) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "from and to are required (YYYY-MM-DD)",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "from and to are required (YYYY-MM-DD)",
+      });
     }
 
     // Fetch programs that are wired to Cal and active
@@ -621,14 +744,91 @@ router.put("/:id", async (req, res) => {
 });
 
 /* =========================================================
-   DELETE PROGRAM
+   DELETE PROGRAM  → ARCHIVE + DEACTIVATE CAL
+   (keeps row for analytics, hides from calendar/embed)
 ========================================================= */
 router.delete("/:id", async (req, res) => {
+  const programId = req.params.id;
+
   try {
-    await pool.query("DELETE FROM programs WHERE id=$1", [req.params.id]);
-    res.json({ message: "Program deleted" });
+    // 1) Soft-delete: mark as inactive, keep everything else
+    const updateRes = await pool.query(
+      `
+      UPDATE programs
+      SET is_active = FALSE
+      WHERE id = $1
+      RETURNING *
+      `,
+      [programId]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const program = updateRes.rows[0];
+
+    // 2) Try to deactivate Cal event type if linked
+    await deactivateCalEventTypeIfAny(program);
+
+    // 3) Return archived program
+    res.json({
+      message:
+        "Program archived (is_active = false). Cal event disabled if linked.",
+      program,
+    });
   } catch (err) {
-    console.error("❌ Error deleting program:", err);
+    console.error("❌ Error archiving program:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* =========================================================
+   SUBCATEGORY SUGGESTIONS (READ-ONLY)
+   GET /api/programs/subcategories?category=Gentle%20Exercise
+   - Returns distinct subcategory values for that category
+   - Source = category_subcategories + programs.subcategory
+========================================================= */
+router.get("/subcategories", async (req, res) => {
+  try {
+    const { category } = req.query;
+
+    if (!category || !String(category).trim()) {
+      return res
+        .status(400)
+        .json({ error: "category query parameter is required" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT sub AS subcategory
+      FROM (
+        -- explicit subcategories table
+        SELECT name AS sub
+        FROM category_subcategories
+        WHERE category_name = $1
+
+        UNION
+
+        -- legacy / existing subcategories from programs
+        SELECT DISTINCT subcategory AS sub
+        FROM programs
+        WHERE category = $1
+          AND subcategory IS NOT NULL
+          AND subcategory <> ''
+      ) t
+      ORDER BY sub ASC
+      `,
+      [category]
+    );
+
+    const subcategories = result.rows
+      .map((r) => r.subcategory)
+      .filter((v) => typeof v === "string" && v.trim().length > 0);
+
+    res.json({ category, subcategories });
+  } catch (err) {
+    console.error("❌ Error fetching subcategories:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

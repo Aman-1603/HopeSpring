@@ -1,29 +1,26 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Calendar, DollarSign, TrendingUp, Plus } from "lucide-react";
+import {
+  Users,
+  Calendar,
+  DollarSign,
+  TrendingUp,
+  Plus,
+} from "lucide-react";
+
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
+  CartesianGrid,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import AdminLayout from "../AdminLayout"; // <-- wrap dashboard inside layout
 
-// Mock data
-const donationData = [
-  { month: "Jan", amount: 4000 },
-  { month: "Feb", amount: 3000 },
-  { month: "Mar", amount: 5000 },
-  { month: "Apr", amount: 4500 },
-  { month: "May", amount: 6000 },
-  { month: "Jun", amount: 5500 },
-];
+import AdminLayout from "../AdminLayout";
 
+// Static attendance temp data
 const attendanceData = [
   { program: "Yoga", rate: 85 },
   { program: "Meditation", rate: 78 },
@@ -31,135 +28,207 @@ const attendanceData = [
   { program: "Art Therapy", rate: 70 },
 ];
 
-const AdminDashboard = () => {
+export default function AdminDashboard() {
   const navigate = useNavigate();
 
+  const [userCount, setUserCount] = useState(0);
+  const [programCount, setProgramCount] = useState(0);
+
+  const [donationTotal, setDonationTotal] = useState(0);
+  const [donationData, setDonationData] = useState([]);
+
+  // ============================
+  // FETCH USERS
+  // ============================
+  const loadUsers = async () => {
+    try {
+      const res = await fetch("/api/users");
+      const data = await res.json();
+      setUserCount(data.length);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
+  };
+
+  // ============================
+  // FETCH PROGRAMS
+  // ============================
+  const loadPrograms = async () => {
+    try {
+      const res = await fetch("/api/programs");
+      const data = await res.json();
+      setProgramCount(data.length);
+    } catch (err) {
+      console.error("Error fetching programs:", err);
+    }
+  };
+
+  // ============================
+  // FETCH DONATIONS (Dynamic Graph)
+  // ============================
+  const loadDonations = async () => {
+    try {
+      const res = await fetch("/api/admin/donations");
+      const data = await res.json();
+
+      if (!data.success) return;
+
+      // Total donations
+      const total = data.donations.reduce(
+        (sum, d) => sum + d.amount_cents,
+        0
+      );
+      setDonationTotal((total / 100).toFixed(2));
+
+      // Graph → amount/day (Same as AdminDonations)
+      const formatted = data.donations.map((d) => ({
+        date: new Date(d.created_at).toLocaleDateString(),
+        amount: d.amount_cents / 100,
+      }));
+
+      setDonationData(formatted);
+    } catch (err) {
+      console.error("Error fetching donations:", err);
+    }
+  };
+
+  // ============================
+  // LOAD ALL
+  // ============================
+  useEffect(() => {
+    loadUsers();
+    loadPrograms();
+    loadDonations();
+  }, []);
+
+  // ============================
+  // STATS CARDS
+  // ============================
   const stats = [
-    { title: "Total Users", value: "1,247", icon: Users, change: "+12%" },
-    { title: "Active Programs", value: "24", icon: Calendar, change: "+3" },
-    { title: "Total Donations", value: "$28,500", icon: DollarSign, change: "+18%" },
-    { title: "Avg. Attendance", value: "81%", icon: TrendingUp, change: "+5%" },
+    { title: "Total Users", value: userCount, icon: Users },
+    { title: "Active Programs", value: programCount, icon: Calendar },
+    { title: "Total Donations", value: `$${donationTotal}`, icon: DollarSign },
+    { title: "Avg. Attendance", value: "81%", icon: TrendingUp },
   ];
 
-  const handleCardClick = (title) => {
+  const handleClick = (title) => {
     if (title === "Total Users") navigate("/admin/users");
-    else if (title === "Active Programs") navigate("/admin/programs");
-    else if (title === "Total Donations") navigate("/admin/donations");
-    else if (title === "Avg. Attendance") navigate("/admin/attendance");
+    if (title === "Active Programs") navigate("/admin/programs");
+    if (title === "Total Donations") navigate("/admin/donations");
   };
 
   return (
     <AdminLayout>
+
       <div className="space-y-10 bg-gradient-to-b from-[#f7f5fb] to-[#f3f0fa] min-h-screen p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-            Dashboard Overview
-          </h1>
-          <p className="text-gray-500 mt-1">
-            Welcome back! Here’s what’s happening today.
-          </p>
+
+        {/* -------------------------------- HEADER ------------------------------- */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+              Dashboard Overview
+            </h1>
+            <p className="text-gray-500 mt-1">
+              Welcome back! Here's what’s happening.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-400 text-white">
+              <Calendar className="w-4 h-4" />
+              Add Program
+            </button>
+
+            <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-300">
+              <Plus className="w-4 h-4" />
+              New Announcement
+            </button>
+          </div>
         </div>
 
-        {/* Add Program + Announcement buttons */}
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-400 text-white hover:opacity-90 transition-all">
-            <Calendar className="w-4 h-4" />
-            Add Program
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 transition-all">
-            <Plus className="w-4 h-4" />
-            New Announcement
-          </button>
-        </div>
-      </div>
-        {/* Stats Grid */}
+        {/* -------------------------------- STATS GRID ------------------------------- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
+          {stats.map((s, i) => (
             <div
-              key={index}
-              onClick={() => handleCardClick(stat.title)}
-              className="bg-white rounded-2xl p-6 shadow-md border border-gray-100 transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer"
+              key={i}
+              onClick={() => handleClick(s.title)}
+              className="bg-white rounded-2xl p-6 shadow-md hover:shadow-lg border border-gray-100 cursor-pointer transition"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">{stat.title}</p>
-                  <h3 className="text-2xl font-bold text-gray-800 mt-1">
-                    {stat.value}
+                  <p className="text-sm text-gray-500">{s.title}</p>
+                  <h3 className="text-2xl font-bold text-gray-800">
+                    {s.value}
                   </h3>
-                  <p className="text-xs text-[#7c6cf2] mt-1">
-                    {stat.change} from last month
-                  </p>
                 </div>
+
                 <div className="p-3 rounded-xl bg-[#f3f0fa]">
-                  <stat.icon className="w-6 h-6 text-[#7c6cf2]" />
+                  <s.icon className="w-6 h-6 text-[#7c6cf2]" />
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Charts Section */}
+        {/* -------------------------------- CHARTS GRID ------------------------------- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Donation Trend */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-md">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-800">Donation Trend</h2>
-            </div>
-            <div className="p-6">
-              <ResponsiveContainer width="100%" height={250}>
+
+          {/* --------- DYNAMIC DONATION GRAPH (MATCHING AdminDonations.jsx) --------- */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">
+              Donation Trend
+            </h3>
+
+            <div className="w-full h-64">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={donationData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis dataKey="month" stroke="#888" />
-                  <YAxis stroke="#888" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #ddd",
-                      borderRadius: "8px",
-                    }}
-                  />
+                  <CartesianGrid stroke="#e5e7eb" strokeDasharray="5 5" />
+                  <XAxis dataKey="date" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip />
+
                   <Line
                     type="monotone"
                     dataKey="amount"
-                    stroke="#7c6cf2"
-                    strokeWidth={2}
+                    stroke="#7c3aed"
+                    strokeWidth={3}
+                    dot={{ r: 5, strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Attendance Rate */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-md">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-800">
-                Program Attendance Rate
-              </h2>
-            </div>
-            <div className="p-6">
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={attendanceData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                  <XAxis dataKey="program" stroke="#888" />
-                  <YAxis stroke="#888" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #ddd",
-                      borderRadius: "8px",
-                    }}
+          {/* ---------------------------- STATIC ATTENDANCE GRAPH ---------------------------- */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">
+              Program Attendance Rate
+            </h3>
+
+            <div className="w-full h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={attendanceData}>
+                  <CartesianGrid stroke="#e5e7eb" strokeDasharray="5 5" />
+                  <XAxis dataKey="program" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip />
+
+                  <Line
+                    type="monotone"
+                    dataKey="rate"
+                    stroke="#67c6c6"
+                    strokeWidth={3}
+                    dot={{ r: 5, strokeWidth: 2 }}
                   />
-                  <Bar dataKey="rate" fill="#67c6c6" radius={[8, 8, 0, 0]} />
-                </BarChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
+
         </div>
+
       </div>
+
     </AdminLayout>
   );
-};
-
-export default AdminDashboard;
+}
