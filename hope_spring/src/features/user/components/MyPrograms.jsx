@@ -10,6 +10,15 @@ import {
   CalendarPlus,
 } from "lucide-react";
 
+// Helper to centralize status logic
+const getStatusInfo = (program) => {
+  const status = (program?.status || "upcoming").toLowerCase();
+  const isActive = ["upcoming", "accepted", "confirmed", "booked"].includes(
+    status
+  );
+  return { status, isActive };
+};
+
 const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -29,6 +38,10 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
 
   const handleJoinZoom = () => {
     if (!selectedProgram?.zoomLink) return;
+
+    const { isActive } = getStatusInfo(selectedProgram);
+    if (!isActive) return; // extra safety: do not join cancelled/past
+
     window.open(selectedProgram.zoomLink, "_blank", "noopener,noreferrer");
   };
 
@@ -50,11 +63,8 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
     let startDate = null;
 
     if (selectedProgram.startDateTime) {
-      // if you later map a raw ISO string from backend
       startDate = new Date(selectedProgram.startDateTime);
     } else if (selectedProgram.date && selectedProgram.time) {
-      // This can be flaky because date is already "12/05/2025" style,
-      // but we still try.
       startDate = new Date(`${selectedProgram.date} ${selectedProgram.time}`);
     } else if (selectedProgram.date) {
       startDate = new Date(selectedProgram.date);
@@ -71,7 +81,8 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
 
       googleUrl += `&dates=${start}/${end}`;
     }
-    // ❗ IMPORTANT: even if date parsing fails, we still open the URL
+
+    // even if parsing failed, we still open the base URL
     window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -94,17 +105,30 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
         },
       });
 
-      const data = await res.json();
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
 
-      if (!data.success) {
+      if (!res.ok || !data?.success) {
         console.error("Cancel booking error:", data);
-        alert(data.message || "Failed to cancel booking");
+        alert(
+          (data && (data.message || data.error)) ||
+            "Failed to cancel booking. Please try again."
+        );
         return;
       }
 
       // update state in parent
       if (onCancelProgram) {
         onCancelProgram(program.id);
+      }
+
+      // if this program is open in the modal, close it
+      if (selectedProgram?.id === program.id) {
+        handleCloseDetails();
       }
     } catch (err) {
       console.error("Cancel booking request failed:", err);
@@ -157,68 +181,67 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
 
       {/* Program Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {programs.map((program) => (
-          <div
-            key={program.id}
-            className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-lg transition p-6"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="text-lg font-semibold">{program.title}</h3>
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                  program.status === "upcoming"
-                    ? "bg-primary/10 text-primary"
-                    : "bg-gray-200 text-gray-600"
-                }`}
-              >
-                {program.status || "upcoming"}
-              </span>
-            </div>
+        {programs.map((program) => {
+          const { status, isActive } = getStatusInfo(program);
 
-            <div className="space-y-2 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>{program.date}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                <span>{program.time}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                <span>{program.instructor}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                <span>{program.location}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-sm text-gray-600">
-              {/* date, time, instructor, location */}
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                onClick={() => handleViewDetails(program)}
-                className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-50 transition"
-              >
-                <Eye className="w-4 h-4" />
-                View Details
-              </button>
-
-              {(program.status === "upcoming" ||
-                program.status === "ACCEPTED") && (
-                <button
-                  onClick={() => handleCancelBooking(program)}
-                  className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50 transition"
+          return (
+            <div
+              key={program.id}
+              className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-lg transition p-6"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-semibold">{program.title}</h3>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
                 >
-                  Cancel Booking
+                  {status}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  <span>{program.date}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span>{program.time}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  <span>{program.instructor}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  <span>{program.location}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2">
+                <button
+                  onClick={() => handleViewDetails(program)}
+                  className="w-full flex items-center justify-center gap-2 border border-gray-300 rounded-lg px-4 py-2 text-sm hover:bg-gray-50 transition"
+                >
+                  <Eye className="w-4 h-4" />
+                  View Details
                 </button>
-              )}
+
+                {isActive && (
+                  <button
+                    onClick={() => handleCancelBooking(program)}
+                    className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50 transition"
+                  >
+                    Cancel Booking
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Modal */}
@@ -242,15 +265,20 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
               {selectedProgram.title}
             </h2>
 
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                selectedProgram.status === "upcoming"
-                  ? "bg-primary/10 text-primary"
-                  : "bg-gray-200 text-gray-600"
-              }`}
-            >
-              {selectedProgram.status || "upcoming"}
-            </span>
+            {(() => {
+              const { status, isActive } = getStatusInfo(selectedProgram);
+              return (
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
+                >
+                  {status}
+                </span>
+              );
+            })()}
 
             {/* Optional category/description if provided */}
             {selectedProgram.category && (
@@ -316,21 +344,24 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
                 Add to Calendar
               </button>
 
-              {/* Join Zoom */}
-              <button
-                onClick={selectedProgram.zoomLink ? handleJoinZoom : undefined}
-                disabled={!selectedProgram.zoomLink}
-                className={`px-4 py-2 w-full sm:w-auto text-sm rounded-lg flex items-center justify-center gap-2 transition 
-                  ${
-                    selectedProgram.zoomLink
-                      ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  }
-                `}
-              >
-                <Video className="w-4 h-4" />
-                Join Zoom
-              </button>
+              {/* Join Zoom – only for active + has zoomLink */}
+              {(() => {
+                const { isActive } = getStatusInfo(selectedProgram);
+
+                if (!isActive || !selectedProgram.zoomLink) {
+                  return null;
+                }
+
+                return (
+                  <button
+                    onClick={handleJoinZoom}
+                    className="px-4 py-2 w-full sm:w-auto text-sm rounded-lg flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 transition"
+                  >
+                    <Video className="w-4 h-4" />
+                    Join Zoom
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
