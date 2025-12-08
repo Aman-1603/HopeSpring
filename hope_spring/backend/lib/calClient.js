@@ -467,3 +467,40 @@ export async function getEventType(eventTypeId) {
   if (!eventTypeId) throw new Error("getEventType: eventTypeId is required");
   return calGet(`/event-types/${eventTypeId}`);
 }
+
+
+// lib/calClient.js
+
+// ... existing imports + cal axios instance + other helpers ...
+
+export async function cancelBooking(calBookingId, reason = null) {
+  if (!calBookingId) {
+    throw new Error("calBookingId is required to cancel booking");
+  }
+
+  try {
+    const res = await cal.post(
+      `/bookings/${calBookingId}/cancel`,
+      {
+        cancellationReason:
+          reason || "User requested cancellation via HopeSpring portal",
+      },
+      {
+        headers: {
+          "cal-api-version": "2024-08-13", // same as your curl
+        },
+      }
+    );
+
+    console.log("[CalClient] Booking cancelled in Cal:", calBookingId);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "❌ [CalClient] Failed to cancel Cal booking",
+      calBookingId,
+      err.response?.data || err.message
+    );
+    throw err;
+  }
+}
+

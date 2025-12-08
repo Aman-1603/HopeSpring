@@ -1,7 +1,7 @@
 // backend/routes/bookingRoutes.js
 import express from "express";
 import { pool } from "../db.js";
-import { confirmBooking, declineBooking } from "../lib/calClient.js";
+import { confirmBooking, declineBooking, cancelBooking } from "../lib/calClient.js";
 
 
 const router = express.Router();
@@ -574,12 +574,13 @@ router.get("/past", async (req, res) => {
       .json({ success: false, message: "Server error" });
   }
 });
+
 /* ============================================================
    CANCEL A BOOKING (USER)
    PATCH /api/bookings/:bookingId/cancel
    - Only owner can cancel
-   - Only if status is an "active" seat (accepted/confirmed/booked)
-   - After this, participants count drops => seat freed
+   - Cancels in Cal (if cal_booking_id present)
+   - Sets local status = 'CANCELLED'
 ============================================================ */
 router.patch("/:bookingId/cancel", async (req, res) => {
   try {
@@ -598,18 +599,17 @@ router.patch("/:bookingId/cancel", async (req, res) => {
         .json({ success: false, message: "Invalid booking id" });
     }
 
-    // 1. Fetch booking
+    // 1. Fetch booking (including cal_booking_id)
     const selectSql = `
       SELECT
         id,
         user_id,
         status,
-        program_id
+        program_id,
+        cal_booking_id
       FROM bookings
       WHERE id = $1
     `;
-    console.log("[CANCEL] selectSql:\n", selectSql);
-
     const { rows } = await pool.query(selectSql, [bookingId]);
 
     if (rows.length === 0) {
@@ -620,7 +620,7 @@ router.patch("/:bookingId/cancel", async (req, res) => {
 
     const booking = rows[0];
 
-    // 2. Check ownership
+    // 2. Ownership check
     if (booking.user_id !== user.id) {
       return res
         .status(403)
@@ -628,7 +628,7 @@ router.patch("/:bookingId/cancel", async (req, res) => {
     }
 
     // 3. Only cancel if it's actually taking a seat
-    //    (your other queries treat these as "active" statuses)
+    //    (matches your summary / slot-usage logic)
     const statusLower = (booking.status || "").toLowerCase();
     const activeSeatStatuses = ["accepted", "confirmed", "booked"];
 
@@ -639,18 +639,36 @@ router.patch("/:bookingId/cancel", async (req, res) => {
       });
     }
 
-    // 4. Update status -> CANCELLED
+    // 4. Cancel in Cal if we have a Cal uid
+    if (booking.cal_booking_id) {
+      try {
+        await cancelBooking(
+          booking.cal_booking_id,
+          "User requested cancellation via HopeSpring portal"
+        );
+      } catch (err) {
+        console.error(
+          "❌ Failed to cancel in Cal, aborting local cancel",
+          err.response?.data || err.message
+        );
+        return res.status(502).json({
+          success: false,
+          message:
+            "Failed to cancel booking in scheduling system. Please try again later.",
+        });
+      }
+    }
+
+    // 5. Update local status -> CANCELLED
     const updateSql = `
       UPDATE bookings
       SET status = 'CANCELLED'
       WHERE id = $1
     `;
-    console.log("[CANCEL] updateSql:\n", updateSql);
-
     await pool.query(updateSql, [bookingId]);
 
-    // No need to touch programs table:
-    // participants are computed from COUNT(*) WHERE status IN ('accepted','confirmed','booked')
+    // Seat is free now because all your seat logic only counts
+    // LOWER(status) IN ('accepted','confirmed','booked')
 
     return res.json({ success: true, message: "Booking cancelled" });
   } catch (err) {
@@ -658,6 +676,7 @@ router.patch("/:bookingId/cancel", async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 
 export default router;
