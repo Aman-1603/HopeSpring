@@ -36,12 +36,43 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
     setSelectedProgram(null);
   };
 
-  const handleJoinZoom = () => {
+  // ⭐ NEW — Mark Attendance API Call
+  const markAttendance = async (programId) => {
+    try {
+      const token = localStorage.getItem("hs_token");
+
+      const res = await fetch(`/api/attendance/${programId}/mark`, {
+        method: "PATCH",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (!res.ok) {
+        console.error("Attendance failed:", await res.text());
+      }
+    } catch (err) {
+      console.error("Attendance error:", err);
+    }
+  };
+
+  // ⭐ UPDATED — Join Zoom + Mark Attendance
+  const handleJoinZoom = async () => {
     if (!selectedProgram?.zoomLink) return;
 
     const { isActive } = getStatusInfo(selectedProgram);
-    if (!isActive) return; // extra safety: do not join cancelled/past
+    if (!isActive) return;
 
+    // IMPORTANT: Correct program ID
+    const programId =
+      selectedProgram.program_id || selectedProgram.id;
+
+    console.log("📌 Using programId for attendance:", programId);
+
+    // mark attendance BEFORE opening zoom
+    await markAttendance(programId);
+
+    // open zoom link
     window.open(selectedProgram.zoomLink, "_blank", "noopener,noreferrer");
   };
 
@@ -59,7 +90,6 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
 
     let googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}`;
 
-    // Try to construct a Date from either ISO start or date + time
     let startDate = null;
 
     if (selectedProgram.startDateTime) {
@@ -71,18 +101,16 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
     }
 
     if (startDate && !isNaN(startDate.getTime())) {
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1h
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
       const formatForGoogle = (d) =>
         d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
-      const start = formatForGoogle(startDate);
-      const end = formatForGoogle(endDate);
-
-      googleUrl += `&dates=${start}/${end}`;
+      googleUrl += `&dates=${formatForGoogle(startDate)}/${formatForGoogle(
+        endDate
+      )}`;
     }
 
-    // even if parsing failed, we still open the base URL
     window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -105,28 +133,17 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
         },
       });
 
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
+      const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.success) {
-        console.error("Cancel booking error:", data);
-        alert(
-          (data && (data.message || data.error)) ||
-            "Failed to cancel booking. Please try again."
-        );
+        alert(data?.message || "Failed to cancel booking.");
         return;
       }
 
-      // update state in parent
       if (onCancelProgram) {
         onCancelProgram(program.id);
       }
 
-      // if this program is open in the modal, close it
       if (selectedProgram?.id === program.id) {
         handleCloseDetails();
       }
@@ -136,7 +153,7 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
     }
   };
 
-  // 🔹 Loading state
+  // Loading UI
   if (loadingPrograms) {
     return (
       <section className="space-y-6">
@@ -161,7 +178,7 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
     );
   }
 
-  // 🔹 No programs
+  // No programs
   if (!hasPrograms) {
     return (
       <section className="space-y-6">
@@ -173,6 +190,7 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
     );
   }
 
+  // Main Render
   return (
     <section className="space-y-6">
       <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -265,22 +283,23 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
               {selectedProgram.title}
             </h2>
 
-            {(() => {
-              const { status, isActive } = getStatusInfo(selectedProgram);
-              return (
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  {status}
-                </span>
-              );
-            })()}
+            <>
+              {(() => {
+                const { status, isActive } = getStatusInfo(selectedProgram);
+                return (
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "bg-gray-200 text-gray-600"
+                    }`}
+                  >
+                    {status}
+                  </span>
+                );
+              })()}
+            </>
 
-            {/* Optional category/description if provided */}
             {selectedProgram.category && (
               <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 {selectedProgram.category}
@@ -327,7 +346,6 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-              {/* Close */}
               <button
                 onClick={handleCloseDetails}
                 className="px-4 py-2 w-full sm:w-auto text-sm rounded-lg border border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 transition"
@@ -335,7 +353,6 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
                 Close
               </button>
 
-              {/* Add to Calendar */}
               <button
                 onClick={handleAddToGoogleCalendar}
                 className="px-3 py-2 w-full sm:w-auto text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 transition flex items-center justify-center gap-2"
@@ -344,7 +361,6 @@ const MyPrograms = ({ programs, loadingPrograms, onCancelProgram }) => {
                 Add to Calendar
               </button>
 
-              {/* Join Zoom – only for active + has zoomLink */}
               {(() => {
                 const { isActive } = getStatusInfo(selectedProgram);
 

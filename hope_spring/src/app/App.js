@@ -73,6 +73,7 @@ import AdminBookings from "../features/admin/pages/AdminBookingFetch";
 import FaciliatorDashboard from "../features/facilitator/FacilitatorDashboard.js"
 import AdminDonations from "../features/admin/pages/AdminDonation";
 import AdminFetchBookings from "../features/admin/pages/AdminFetchBookedProgram";
+import AttendanceDashboard from "../features/admin/pages/AdminAttendance";
 
 export default function App() {
   const location = useLocation();
@@ -289,6 +290,15 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <AdminFetchBookings/>
+              </ProtectedRoute>
+            }
+          />
+
+                <Route
+            path="/admin/attendance"
+            element={
+              <ProtectedRoute role="admin">
+               <AttendanceDashboard/>
               </ProtectedRoute>
             }
           />
