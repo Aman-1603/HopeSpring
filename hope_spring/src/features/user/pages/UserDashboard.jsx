@@ -30,6 +30,14 @@ const UserDashboard = () => {
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
+  const handleCancelProgramLocal = (bookingId) => {
+  setPrograms((prev) =>
+    prev.map((p) =>
+      p.id === bookingId ? { ...p, status: "cancelled" } : p
+    )
+  );
+};
+
   // 🔹 Fetch user bookings from backend
 useEffect(() => {
   if (!user) return;
@@ -236,7 +244,7 @@ useEffect(() => {
           />
 
           <div className="mt-8 space-y-8">
-            <MyPrograms programs={programs} loadingPrograms={loadingPrograms} />
+            <MyPrograms programs={programs} loadingPrograms={loadingPrograms} onCancelProgram={handleCancelProgramLocal} />
             <AnnouncementsFeed announcements={announcements}
             loading={loadingAnnouncements}
             error={announcementsError} />
