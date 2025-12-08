@@ -72,6 +72,7 @@ import AdminSupport from "../features/admin/pages/AdminSupport";
 import AdminBookings from "../features/admin/pages/AdminBookingFetch";
 import FaciliatorDashboard from "../features/facilitator/FacilitatorDashboard.js"
 import AdminDonations from "../features/admin/pages/AdminDonation";
+import AdminFetchBookings from "../features/admin/pages/AdminFetchBookedProgram";
 
 export default function App() {
   const location = useLocation();
@@ -279,6 +280,15 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <AdminWaitlist />
+              </ProtectedRoute>
+            }
+          />
+
+                  <Route
+            path="/admin/FetchBooking"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminFetchBookings/>
               </ProtectedRoute>
             }
           />
