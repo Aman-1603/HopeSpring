@@ -1,3 +1,4 @@
+// src/features/admin/pages/AddProgram.js
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import AdminLayout from "../AdminLayout";
@@ -22,9 +23,6 @@ const CAL_BASE = "/api/cal";
 /** simple slugger used both in UI + save */
 const normalizeCategory = (v) =>
   (v || "").trim().toLowerCase().replace(/\s+/g, "_");
-
-/** subcategories for Gentle Exercise */
-const GENTLE_EXERCISE_SUBCATS = ["Meditation", "Yoga", "Tai Chi", "Qi Gong"];
 
 // Location handling
 const LOCATION_TYPE_ONLINE = "online_zoom";
@@ -79,12 +77,25 @@ export default function ProgramManagement() {
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
 
+  // NEW: dedicated subcategory manager modal
+  const [showSubcategoriesModal, setShowSubcategoriesModal] = useState(false);
+
   const [formData, setFormData] = useState(emptyForm);
   const [editMode, setEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const [newCategory, setNewCategory] = useState("");
   const [calLoadingId, setCalLoadingId] = useState(null);
+
+  // NEW: subcategory suggestions for current category
+  const [subcategoryOptions, setSubcategoryOptions] = useState([]);
+  const [subcategoriesLoading, setSubcategoriesLoading] = useState(false);
+
+  // NEW: subcategory manager state
+  const [subcatManageCategory, setSubcatManageCategory] = useState("");
+  const [managedSubcategories, setManagedSubcategories] = useState([]);
+  const [newManagedSubcategory, setNewManagedSubcategory] = useState("");
+  const [subcatManageLoading, setSubcatManageLoading] = useState(false);
 
   /* --------------------------- fetchers --------------------------- */
   useEffect(() => {
@@ -104,9 +115,38 @@ export default function ProgramManagement() {
   const fetchCategories = async () => {
     try {
       const res = await axios.get(`${API_BASE}/categories/all`);
-      setCategories((res.data || []).map((c) => c.name));
+      const names = (res.data || []).map((c) => c.name);
+      setCategories(names);
+
+      // if subcategory modal is open and no category selected yet, pick first
+      if (!subcatManageCategory && names.length > 0) {
+        setSubcatManageCategory(names[0]);
+      }
     } catch (e) {
       console.error("fetchCategories:", e);
+    }
+  };
+
+  // NEW: load subcategories for a given category (from backend union)
+  const fetchSubcategoriesForCategory = async (categoryName) => {
+    if (!categoryName) {
+      setSubcategoryOptions([]);
+      return;
+    }
+    try {
+      setSubcategoriesLoading(true);
+      const res = await axios.get(`${API_BASE}/subcategories`, {
+        params: { category: categoryName },
+      });
+      const list = (res.data?.subcategories || []).filter(
+        (v) => typeof v === "string" && v.trim().length > 0
+      );
+      setSubcategoryOptions(list);
+    } catch (e) {
+      console.error("fetchSubcategories:", e);
+      setSubcategoryOptions([]);
+    } finally {
+      setSubcategoriesLoading(false);
     }
   };
   /* --------------------------------------------------------------- */
@@ -115,6 +155,8 @@ export default function ProgramManagement() {
     setEditMode(false);
     setFormData({ ...emptyForm });
     setShowProgramModal(true);
+    // reset suggestions
+    setSubcategoryOptions([]);
   };
 
   const openEdit = async (p) => {
@@ -172,12 +214,121 @@ export default function ProgramManagement() {
     });
 
     setShowProgramModal(true);
+    // we let the useEffect on formData.category load suggestions
   };
 
   const closeProgramModal = () => {
     setShowProgramModal(false);
     setEditMode(false);
     setFormData(emptyForm);
+    setSubcategoryOptions([]);
+  };
+
+  /* --- when category changes in the form, refresh subcategory suggestions --- */
+  useEffect(() => {
+    if (!showProgramModal) return;
+    if (!formData.category) {
+      setSubcategoryOptions([]);
+      return;
+    }
+    fetchSubcategoriesForCategory(formData.category);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.category, showProgramModal]);
+
+  /* ----------------- Subcategory manager (admin modal) ----------------- */
+
+  const openSubcategoriesModal = () => {
+    // pick a default category if none selected yet
+    let cat = subcatManageCategory;
+    if (!cat && categories.length > 0) {
+      cat = categories[0];
+      setSubcatManageCategory(cat);
+    }
+    setShowSubcategoriesModal(true);
+  };
+
+  const closeSubcategoriesModal = () => {
+    setShowSubcategoriesModal(false);
+    setManagedSubcategories([]);
+    setNewManagedSubcategory("");
+  };
+
+  const fetchManagedSubcategories = async (categoryName) => {
+    if (!categoryName) {
+      setManagedSubcategories([]);
+      return;
+    }
+    try {
+      setSubcatManageLoading(true);
+      const res = await axios.get(
+        `${API_BASE}/categories/${encodeURIComponent(
+          categoryName
+        )}/subcategories`
+      );
+      setManagedSubcategories(res.data?.subcategories || []);
+    } catch (e) {
+      console.error("fetchManagedSubcategories:", e);
+      setManagedSubcategories([]);
+    } finally {
+      setSubcatManageLoading(false);
+    }
+  };
+
+  // whenever modal open + category changes, load
+  useEffect(() => {
+    if (!showSubcategoriesModal) return;
+    if (!subcatManageCategory) {
+      setManagedSubcategories([]);
+      return;
+    }
+    fetchManagedSubcategories(subcatManageCategory);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSubcategoriesModal, subcatManageCategory]);
+
+  const addManagedSubcategory = async () => {
+    const name = newManagedSubcategory.trim();
+    if (!name || !subcatManageCategory) return;
+
+    try {
+      setSubcatManageLoading(true);
+      await axios.post(
+        `${API_BASE}/categories/${encodeURIComponent(
+          subcatManageCategory
+        )}/subcategories`,
+        { name }
+      );
+      setNewManagedSubcategory("");
+      await fetchManagedSubcategories(subcatManageCategory);
+    } catch (e) {
+      console.error("addManagedSubcategory:", e);
+      alert("Failed to add subcategory.");
+    } finally {
+      setSubcatManageLoading(false);
+    }
+  };
+
+  const deleteManagedSubcategory = async (subName) => {
+    if (
+      !window.confirm(
+        `Delete subcategory "${subName}" from "${subcatManageCategory}"?`
+      )
+    ) {
+      return;
+    }
+    try {
+      setSubcatManageLoading(true);
+      await axios.delete(
+        `${API_BASE}/categories/${encodeURIComponent(
+          subcatManageCategory
+        )}/subcategories/${encodeURIComponent(subName)}`
+      );
+      await fetchManagedSubcategories(subcatManageCategory);
+    } catch (e) {
+      console.error("deleteManagedSubcategory:", e);
+      alert("Failed to delete subcategory.");
+    } finally {
+      setSubcatManageLoading(false);
+    }
   };
 
   /* --------------------------- Cal --------------------------- */
@@ -217,20 +368,25 @@ export default function ProgramManagement() {
       // silent; Cal may not be linked yet
     }
   };
+
+  // sync Cal seats (max_capacity -> seatsPerTimeSlot)
+  const syncCalSeats = async (programId) => {
+    try {
+      await axios.post(`${CAL_BASE}/programs/${programId}/sync-seats`);
+    } catch (e) {
+      console.error("syncCalSeats:", e);
+      // silent; Cal may not be linked yet
+    }
+  };
   /* ---------------------------------------------------------- */
 
-  /* ---------------------- save/delete programs ---------------------- */
+  /* ---------------------- save / archive / delete ---------------------- */
   const saveProgram = async () => {
     const normalizedCategoryValue = normalizeCategory(formData.category);
     const isSupportGroup = normalizedCategoryValue === "support_group";
-    const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
-    // const isCounselling = normalizedCategoryValue === "counselling";
 
-    // any category that should automatically be wired to Cal
-    // NOTE: counselling uses Cal as a request system, but we don't
-    // auto-create/update its event type on save to avoid surprises.
-    const wantsCalIntegration =
-      isSupportGroup || isGentleExercise; // NOT counselling
+    // every program should have a Cal event type
+    const wantsCalIntegration = true;
 
     const storedCategory = isSupportGroup
       ? "support_group"
@@ -269,15 +425,11 @@ export default function ProgramManagement() {
       }
     }
 
-    if (isGentleExercise && !formData.subcategory) {
-      return alert("Select a subcategory for Gentle Exercise.");
-    }
-
     const payload = {
       title: formData.title.trim(),
       description: formData.description.trim(),
       category: storedCategory,
-      subcategory: isGentleExercise ? formData.subcategory || null : null,
+      subcategory: formData.subcategory ? formData.subcategory.trim() : null,
 
       // scheduling is handled by Cal – keep these null
       date: null,
@@ -311,8 +463,9 @@ export default function ProgramManagement() {
         await fetchPrograms();
 
         if (wantsCalIntegration) {
-          // Only duration is synced. Seats are managed in Cal dashboard UI.
+          // duration + seats from DB -> Cal
           await syncCalDuration(formData.id);
+          await syncCalSeats(formData.id);
         }
       } else {
         // CREATE
@@ -324,6 +477,8 @@ export default function ProgramManagement() {
           await createCalEventType(createdId, true);
           // 2) Sync duration from DB → Cal eventType.lengthInMinutes
           await syncCalDuration(createdId);
+          // 3) Sync seats from DB → Cal eventType.seatsPerTimeSlot
+          await syncCalSeats(createdId);
         } else {
           await fetchPrograms();
         }
@@ -335,6 +490,17 @@ export default function ProgramManagement() {
       alert("Save failed. Check backend logs.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // toggle is_active = archive / unarchive
+  const setProgramActive = async (id, nextActive) => {
+    try {
+      await axios.put(`${API_BASE}/${id}`, { is_active: nextActive });
+      await fetchPrograms();
+    } catch (e) {
+      console.error("setProgramActive:", e);
+      alert("Failed to update active status.");
     }
   };
 
@@ -359,6 +525,9 @@ export default function ProgramManagement() {
       const res = await axios.post(`${API_BASE}/categories`, { name });
       if (!res.data.existing) {
         setCategories((prev) => [...prev, res.data.name]);
+        if (!subcatManageCategory) {
+          setSubcatManageCategory(res.data.name);
+        }
       }
       setNewCategory("");
     } catch (e) {
@@ -372,6 +541,13 @@ export default function ProgramManagement() {
     try {
       await axios.delete(`${API_BASE}/categories/${encodeURIComponent(cat)}`);
       setCategories((prev) => prev.filter((c) => c !== cat));
+
+      // if we were managing this category, reset
+      if (subcatManageCategory === cat) {
+        const remaining = categories.filter((c) => c !== cat);
+        setSubcatManageCategory(remaining[0] || "");
+        setManagedSubcategories([]);
+      }
     } catch (e) {
       console.error("deleteCategory:", e);
       alert("Category delete failed.");
@@ -392,8 +568,6 @@ export default function ProgramManagement() {
 
   const normalizedCategoryValue = normalizeCategory(formData.category);
   const isSupportGroup = normalizedCategoryValue === "support_group";
-  const isGentleExercise = normalizedCategoryValue === "gentle_exercise";
-  // const isCounselling = normalizedCategoryValue === "counselling"; // ready if we want conditional UI later
 
   return (
     <AdminLayout>
@@ -409,7 +583,7 @@ export default function ProgramManagement() {
               Cal.com.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowCategoriesModal(true)}
               className="flex items-center gap-1 border border-[#d0c8ff] text-[#6b5df5] px-3 py-2 rounded-xl text-sm bg:white hover:bg-[#f4f1ff]"
@@ -417,6 +591,16 @@ export default function ProgramManagement() {
               <Tag className="w-4 h-4" />
               Categories
             </button>
+
+            {/* NEW: Subcategory manager button */}
+            <button
+              onClick={openSubcategoriesModal}
+              className="flex items-center gap-1 border border-[#cbd5f5] text-[#4338ca] px-3 py-2 rounded-xl text-sm bg-white hover:bg-[#e0e7ff]"
+            >
+              <Tag className="w-4 h-4" />
+              Subcategories
+            </button>
+
             <button
               onClick={openAdd}
               className="flex items-center gap-1 bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-4 py-2 rounded-xl text-sm shadow-md hover:shadow-lg"
@@ -465,15 +649,26 @@ export default function ProgramManagement() {
 
             const durationLabel = formatDuration(p.duration_minutes);
 
+            const archived = !p.is_active;
+
             return (
               <div
                 key={p.id}
-                className="bg-white rounded-2xl border border-[#e5e0ff] shadow-sm p-5 space-y-3"
+                className={`bg-white rounded-2xl border shadow-sm p-5 space-y-3 ${
+                  archived
+                    ? "border-red-100 bg-red-50/40 opacity-80"
+                    : "border-[#e5e0ff]"
+                }`}
               >
                 <div className="flex justify-between items-start gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       {p.title}
+                      {archived && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                          Archived
+                        </span>
+                      )}
                     </h2>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#f4f1ff] border border-[#e0d8ff] text-[#6b5df5]">
@@ -594,7 +789,7 @@ export default function ProgramManagement() {
                   )}
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <button
                     onClick={() => openEdit(p)}
                     className="inline-flex items-center gap-1 border border-[#d0c8ff] px-3 py-1.5 rounded-xl text-sm text-[#6b5df5] bg-white hover:bg-[#f5f3ff]"
@@ -602,6 +797,23 @@ export default function ProgramManagement() {
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
+
+                  {p.is_active ? (
+                    <button
+                      onClick={() => setProgramActive(p.id, false)}
+                      className="inline-flex items-center gap-1 border border-amber-200 px-3 py-1.5 rounded-xl text-sm text-amber-700 bg-amber-50 hover:bg-amber-100"
+                    >
+                      Archive
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setProgramActive(p.id, true)}
+                      className="inline-flex items-center gap-1 border border-emerald-200 px-3 py-1.5 rounded-xl text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                    >
+                      Unarchive
+                    </button>
+                  )}
+
                   <button
                     onClick={() => deleteProgram(p.id)}
                     className="inline-flex items-center gap-1 border border-[#fecaca] px-3 py-1.5 rounded-xl text-sm text-[#b91c1c] bg-white hover:bg-[#fee2e2]"
@@ -662,7 +874,6 @@ export default function ProgramManagement() {
                       setFormData((p) => ({
                         ...p,
                         category: e.target.value,
-                        subcategory: "",
                       }))
                     }
                   >
@@ -689,9 +900,9 @@ export default function ProgramManagement() {
                 </Field>
               </div>
 
-              {isGentleExercise && (
-                <Field label="Subcategory *">
-                  <select
+              <Field label="Subcategory (optional)">
+                <div className="space-y-2">
+                  <input
                     className="w-full border rounded-xl px-3 py-2 text-sm"
                     value={formData.subcategory}
                     onChange={(e) =>
@@ -700,16 +911,53 @@ export default function ProgramManagement() {
                         subcategory: e.target.value,
                       }))
                     }
-                  >
-                    <option value="">Select subcategory</option>
-                    {GENTLE_EXERCISE_SUBCATS.map((sc) => (
-                      <option key={sc} value={sc}>
-                        {sc}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              )}
+                    placeholder="e.g. Meditation, Chemo Brain, Practice"
+                  />
+
+                  {/* suggestions for current category */}
+                  {formData.category && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
+                      {subcategoriesLoading && (
+                        <span className="text-gray-400">
+                          Loading subcategories…
+                        </span>
+                      )}
+
+                      {!subcategoriesLoading &&
+                        subcategoryOptions.length > 0 && (
+                          <>
+                            <span className="text-gray-400">
+                              Suggestions:
+                            </span>
+                            {subcategoryOptions.map((sc) => (
+                              <button
+                                key={sc}
+                                type="button"
+                                onClick={() =>
+                                  setFormData((p) => ({
+                                    ...p,
+                                    subcategory: sc,
+                                  }))
+                                }
+                                className="px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                              >
+                                {sc}
+                              </button>
+                            ))}
+                          </>
+                        )}
+
+                      {!subcategoriesLoading &&
+                        formData.category &&
+                        subcategoryOptions.length === 0 && (
+                          <span className="text-gray-400">
+                            No subcategories saved for this category yet.
+                          </span>
+                        )}
+                    </div>
+                  )}
+                </div>
+              </Field>
 
               {/* Support-group-only labels */}
               {isSupportGroup && (
@@ -940,6 +1188,82 @@ export default function ProgramManagement() {
               {categories.length === 0 && (
                 <p className="text-xs text-gray-500">No categories yet.</p>
               )}
+            </div>
+          </Modal>
+        )}
+
+        {/* NEW: Subcategories modal */}
+        {showSubcategoriesModal && (
+          <Modal onClose={closeSubcategoriesModal}>
+            <h2 className="text-lg font-semibold text-gray-800">
+              Manage Subcategories
+            </h2>
+
+            <div className="mt-4 space-y-4">
+              <Field label="Category">
+                <select
+                  className="w-full border rounded-xl px-3 py-2 text-sm"
+                  value={subcatManageCategory}
+                  onChange={(e) => setSubcatManageCategory(e.target.value)}
+                >
+                  {categories.length === 0 && (
+                    <option value="">No categories defined yet</option>
+                  )}
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Add Subcategory">
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border rounded-xl px-3 py-2 text-sm"
+                    placeholder="e.g. Meditation"
+                    value={newManagedSubcategory}
+                    onChange={(e) => setNewManagedSubcategory(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addManagedSubcategory()}
+                  />
+                  <button
+                    onClick={addManagedSubcategory}
+                    disabled={!subcatManageCategory || subcatManageLoading}
+                    className="bg-gradient-to-r from-[#9b87f5] to-[#6b5df5] text-white px-4 py-2 rounded-xl text-sm disabled:opacity-60"
+                  >
+                    Add
+                  </button>
+                </div>
+              </Field>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto border border-[#e5e0ff] rounded-2xl p-3 bg-[#fcfbff]">
+                {subcatManageLoading && (
+                  <p className="text-xs text-gray-500">Loading…</p>
+                )}
+
+                {!subcatManageLoading &&
+                  managedSubcategories.map((sc) => (
+                    <div
+                      key={sc.id ?? sc.name}
+                      className="flex items-center justify-between text-sm border border-[#e5e0ff] rounded-xl px-3 py-1.5 bg-white"
+                    >
+                      <span>{sc.name}</span>
+                      <button
+                        onClick={() => deleteManagedSubcategory(sc.name)}
+                        className="text-red-500 text-xs hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+
+                {!subcatManageLoading &&
+                  managedSubcategories.length === 0 && (
+                    <p className="text-xs text-gray-500">
+                      No subcategories for this category yet.
+                    </p>
+                  )}
+              </div>
             </div>
           </Modal>
         )}

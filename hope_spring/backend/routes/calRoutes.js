@@ -68,7 +68,7 @@ function makeSeatsPatchFromCapacity(capacity) {
 -------------------------------- */
 async function linkProgramToCal(programId, res) {
   try {
-    // 1) Load program - include max_capacity + duration_minutes
+    // 1) Load program - include max_capacity + duration_minutes + is_active
     const progRes = await pool.query(
       `
       SELECT id,
@@ -79,7 +79,8 @@ async function linkProgramToCal(programId, res) {
              cal_event_type_id,
              cal_schedule_id,
              cal_slug,
-             cal_user
+             cal_user,
+             is_active
       FROM programs
       WHERE id = $1
       `,
@@ -91,6 +92,14 @@ async function linkProgramToCal(programId, res) {
     }
 
     const prog = progRes.rows[0];
+
+    // 🔒 Don’t create / relink Cal events for archived programs
+    if (prog.is_active === false) {
+      return res.status(400).json({
+        error:
+          "Program is archived. Unarchive it before creating or relinking a Cal event type.",
+      });
+    }
 
     // 2) If already linked, just confirm + return
     if (prog.cal_event_type_id) {
