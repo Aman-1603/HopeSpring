@@ -23,6 +23,8 @@ import adminDonationRoutes  from "./routes/adminDonationRoutes.js"
 import adminAllBookings  from "./routes/adminAllBookings.js"
 import attendanceRoutes  from "./routes/attendanceRoutes.js"
 import adminAttendanceRoutesFetch from "./routes/adminAttendanceRoutesFetch.js"
+import facilitatorRoutes from "./routes/facilitatorRoutes.js";
+
 
 dotenv.config();
 
@@ -267,6 +269,7 @@ app.use("/api/programs", programRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/boutique", requireAuth, boutiqueRoutes);
 app.use("/api/admin/donations", adminDonationRoutes);
+app.use("/api/facilitator", facilitatorRoutes);
 
 
 //fetch all booked program in the admin
