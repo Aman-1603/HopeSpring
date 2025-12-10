@@ -870,32 +870,51 @@ export default function ProgramTemplate({ config }) {
       </section>
 
       {/* Partner programs */}
-      {partnerPrograms.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 py-10">
-          <SectionTitle
-            title="Offered by community partners"
-            kicker="Additional options"
-          />
-        </section>
-      )}
+    
 
       {/* FAQ */}
-      {faqItems.length > 0 && (
-        <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
-          {faqImage && (
-            <img
-              src={faqImage}
-              alt={faqAlt || "Program illustration"}
-              className="h-96 w-full rounded-2xl object-cover"
-            />
-          )}
-          <div>
-            <h3 className="text-2xl font-semibold">
-              Frequently Asked Questions
-            </h3>
-          </div>
-        </section>
-      )}
+{faqItems.length > 0 && (
+  <section className="mx-auto max-w-6xl grid items-start gap-8 px-4 py-10 md:grid-cols-2">
+    {faqImage && (
+      <img
+        src={faqImage}
+        alt={faqAlt || "Program illustration"}
+        className="h-96 w-full rounded-2xl object-cover"
+      />
+    )}
+
+    <div>
+      <h3 className="text-2xl font-semibold">
+        Frequently Asked Questions
+      </h3>
+      <p className="mt-2 text-sm text-gray-600">
+        Answers to common questions about {subcategoryName.toLowerCase()}.
+      </p>
+
+      <div className="mt-6 divide-y divide-gray-200 border border-gray-200 rounded-xl bg-white">
+        {faqItems.map((item, i) => (
+          <details
+            key={i}
+            className="group"
+            open={i === 0} // first one open by default (optional)
+          >
+            <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-medium text-gray-900">
+              <span>{item.title}</span>
+              <span className="ml-4 text-gray-400 group-open:hidden">+</span>
+              <span className="ml-4 text-gray-400 hidden group-open:inline">
+                –
+              </span>
+            </summary>
+            <div className="px-4 pb-4 text-sm text-gray-600">
+              {item.content}
+            </div>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+)}
+
 
       {/* Related programs */}
       {relatedPrograms.length > 0 && (

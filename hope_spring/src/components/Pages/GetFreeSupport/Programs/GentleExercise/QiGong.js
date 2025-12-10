@@ -6,7 +6,7 @@ const qiGongConfig = {
   categoryName: "Gentle Exercise",
   subcategoryName: "Qi Gong",
 
-  heroImage: "/images/qigong-banner.png", // use your real banner path
+  heroImage: "/images/qi-gong-banner.png", // use your real banner path
   heroAlt: "Qi Gong practice",
   heroTag: "Program – Qi Gong",
   heroTitle: "Qi Gong",
@@ -18,7 +18,7 @@ const qiGongConfig = {
   introBody:
     "In this program, you'll explore gentle movement and breath work designed to support balance, calm, and overall wellbeing. Movements are adaptable and suitable for people with different energy levels and mobility.",
 
-  benefitsImage: "/images/qigong-illustration.png", // this was on your old page
+  benefitsImage: "/images/qi-gong-benefits.png", // this was on your old page
   benefitsAlt: "Qi Gong illustration",
   benefits: [
     {
@@ -50,7 +50,7 @@ const qiGongConfig = {
     },
   ],
 
-  faqImage: "/images/faq-qigong.webp", // or reuse /images/faq-med.webp if you don't have this
+  faqImage: "/images/faq-med.webp", // or reuse /images/faq-med.webp if you don't have this
   faqAlt: "Qi Gong posture",
   faqItems: [
     {

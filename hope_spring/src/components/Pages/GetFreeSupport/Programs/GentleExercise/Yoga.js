@@ -35,13 +35,13 @@ const yogaConfig = {
   ],
 
   facilitators: [
-    { name: "Yoga facilitator", img: "/images/facilitators/yoga-placeholder.png" },
+    { name: "Yoga facilitator", img: "/images/facilitators/Tammy.png" },
     // update with real people/images later
   ],
 
   partnerPrograms: [],
 
-  faqImage: "/images/faq-yoga.webp",
+  faqImage: "/images/faq-yoga.png",
   faqAlt: "Yoga pose illustration",
   faqItems: [
     { title: "Do I need to be flexible?", content: "No. Classes are designed for all levels and abilities." },
